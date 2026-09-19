@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Vạn Tải Việt · Theo dõi chuyến</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+<link rel="stylesheet" href="/tracking/tracking.css">
+<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5.6.1/dist/maplibre-gl.css">
+</head><body>
+<header><div class="brand">VẠN TẢI VIỆT <span>ĐIỀU PHỐI & THEO DÕI</span></div><a href="/swagger">Swagger ↗</a></header>
+<main><aside>
+<h1>Theo dõi chuyến xe</h1><p class="muted">Vị trí, hành trình và quyền xem trong một chuyến.</p>
+<form id="login"><label>Số điện thoại<input id="phone" autocomplete="username" placeholder="+849…" required></label><label>Mật khẩu<input id="password" type="password" autocomplete="current-password" required></label><button>Đăng nhập</button></form>
+<section id="session" hidden><div class="row"><strong id="identity"></strong><button id="logout" class="secondary">Đăng xuất</button></div>
+<details id="shipmentComposer"><summary>Đăng hàng · chọn điểm trên bản đồ</summary>
+<p class="muted">Nhập địa chỉ để tài xế đọc và chọn vị trí thực tế trên bản đồ. Chưa có tìm địa chỉ tự động. Giờ lấy hàng theo giờ của thiết bị.</p>
+<form id="shipmentForm">
+<label>Tiêu đề<input id="shipmentTitle" required maxlength="200"></label>
+<label>Địa chỉ lấy hàng<input id="shipmentPickupAddress" required maxlength="500"></label>
+<label>Địa chỉ giao hàng<input id="shipmentDeliveryAddress" required maxlength="500"></label>
+<label>Khối lượng (kg)<input id="shipmentWeight" type="number" min="0.01" max="9999999999.99" step="0.01" required></label>
+<label>Giờ lấy hàng<input id="shipmentPickupAt" type="datetime-local" required></label>
+<label>Điểm đang chọn<select id="shipmentPoint"><option value="">Dừng chọn điểm</option><option value="pickup">Điểm lấy hàng</option><option value="delivery">Điểm giao hàng</option></select></label>
+<p id="shipmentCoordinates" class="muted">Chưa chọn hai điểm.</p>
+<button type="button" id="showShipmentMap" class="secondary">Tới bản đồ để chọn điểm</button>
+<button id="createShipment" type="submit">Lưu tin nháp</button>
+</form>
+<button id="publishShipment" type="button" hidden>Đăng tin vừa tạo</button>
+<button id="newShipment" type="button" class="secondary" hidden>Tạo tin khác</button>
+<p id="shipmentMessage" role="status"></p>
+</details>
+<label>Chuyến của bạn<select id="trips"><option value="">Chọn chuyến</option></select></label>
+<button id="moreTrips" class="secondary">Tải thêm chuyến</button>
+<button id="reloadTrips" class="secondary">Làm mới danh sách</button>
+<label>Hoặc nhập mã chuyến<input id="tripId" placeholder="Trip ID"></label><button id="openTrip">Mở bản đồ</button>
+<div class="divider"></div>
+<h2 id="title">Chưa chọn chuyến</h2><div class="row"><span class="badge" id="tripStatus">—</span><span id="realtime" class="muted">Chưa kết nối</span></div>
+<p id="lastSeen" class="muted">Chưa có dữ liệu GPS.</p><p id="addresses"></p>
+<div class="legend"><span class="blue"></span> Đường GPS thực tế <span class="orange"></span> Tuyến tham khảo</div>
+<p id="routeStatus" class="muted"></p>
+<button id="fit" class="secondary">Xem toàn tuyến</button><button id="loadHistory" class="secondary">Tải thêm lịch sử</button>
+<details><summary>Xem lại lịch sử GPS</summary><p class="muted">Xem các điểm đã tải, theo thời gian ghi nhận. Tải thêm lịch sử để xem các điểm còn lại.</p><input id="historyPosition" type="range" min="0" max="0" value="0" disabled aria-label="Điểm GPS trong lịch sử"><p id="historyDetail" aria-live="polite">Chưa có lịch sử.</p><button id="livePosition" class="secondary">Về vị trí mới nhất</button></details>
+<section id="driverTools" hidden><h3>Vị trí của tài xế</h3><button id="startGps">Bật GPS trình duyệt</button><button id="stopGps" class="secondary">Dừng gửi GPS</button><p class="muted">Giữ trang mở. Trình duyệt không bảo đảm GPS khi tắt màn hình.</p><p id="queue"></p><button id="clearQueue" class="secondary">Xóa điểm chưa gửi trên thiết bị</button>
+<details><summary>Giả lập vị trí để test</summary><p class="muted">Điểm giả lập được đánh dấu riêng. Chỉ có trong Development.</p><label>Vĩ độ<input id="simLat" type="number" step="any" value="21.0285"></label><label>Kinh độ<input id="simLng" type="number" step="any" value="105.8542"></label><button id="simulate" class="secondary">Gửi một điểm giả lập</button></details></section>
+<section id="ownerTools" hidden><details><summary>Điểm lấy / giao hàng</summary><p class="muted">Chỉ sửa khi chuyến chưa bắt đầu. Có thể chọn mục rồi bấm trên bản đồ.</p><select id="clickTarget"><option value="">Không chọn điểm</option><option value="pickup">Chọn điểm lấy hàng</option><option value="delivery">Chọn điểm giao hàng</option></select>
+<label>Lấy hàng · vĩ độ<input id="pickupLat" type="number" step="any"></label><label>Lấy hàng · kinh độ<input id="pickupLng" type="number" step="any"></label><label>Giao hàng · vĩ độ<input id="deliveryLat" type="number" step="any"></label><label>Giao hàng · kinh độ<input id="deliveryLng" type="number" step="any"></label><button id="saveStops">Lưu điểm</button></details>
+<details><summary>Người được xem chuyến</summary><label>Mã tài khoản chủ hàng / môi giới<input id="viewerId" placeholder="User ID"></label><button id="grant" class="secondary">Cấp quyền xem</button><ul id="viewers"></ul></details></section>
+</section><p id="message" role="status" aria-live="polite"></p>
+</aside><section class="mapWrap"><div id="map"></div><div class="mapHint"><span id="mapStatus" role="status">Đang tải nền bản đồ…</span> <button id="retryMap" class="secondary" style="pointer-events:auto">Thử lại</button></div></section></main>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<script src="https://unpkg.com/maplibre-gl@5.6.1/dist/maplibre-gl.js"></script>
+<script src="https://unpkg.com/@maplibre/maplibre-gl-leaflet@0.1.3/leaflet-maplibre-gl.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@microsoft/signalr@10.0.0/dist/browser/signalr.min.js"></script>
+<script type="module" src="/tracking/tracking.js"></script></body></html>
