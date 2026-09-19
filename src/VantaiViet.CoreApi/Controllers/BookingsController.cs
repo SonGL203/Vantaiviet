@@ -24,6 +24,8 @@ public sealed class BookingsController(IBookingService service) : ControllerBase
     {
         if(result.ErrorCode is null) { return Ok(ApiResponse<T>.Ok(result.Data!,HttpContext.TraceIdentifier)); }
         var status=result.ErrorCode switch { "not_found"=>404,"forbidden"=>403,"driver_not_eligible"=>403,"conflict"=>409,"resource_unavailable"=>409,_=>400 };
-        return Problem(statusCode:status,title:"Transport request rejected.",extensions:new Dictionary<string,object?> {["errorCode"]="booking."+result.ErrorCode,["traceId"]=HttpContext.TraceIdentifier});
+        var problem = ProblemDetailsFactory.CreateProblemDetails(HttpContext,statusCode:status,title:"Transport request rejected.");
+        problem.Extensions["errorCode"] = "booking." + result.ErrorCode;
+        return new ObjectResult(problem) { StatusCode=status };
     }
 }

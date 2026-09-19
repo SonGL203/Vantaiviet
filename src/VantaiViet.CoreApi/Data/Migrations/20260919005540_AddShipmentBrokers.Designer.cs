@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using VantaiViet.CoreApi.Data;
@@ -11,9 +12,11 @@ using VantaiViet.CoreApi.Data;
 namespace VantaiViet.CoreApi.Data.Migrations
 {
     [DbContext(typeof(CoreDbContext))]
-    partial class CoreDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260919005540_AddShipmentBrokers")]
+    partial class AddShipmentBrokers
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -602,10 +605,6 @@ namespace VantaiViet.CoreApi.Data.Migrations
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<string>("CredentialStamp")
-                        .HasMaxLength(256)
-                        .HasColumnType("character varying(256)");
-
                     b.Property<string>("Destination")
                         .IsRequired()
                         .HasMaxLength(256)
@@ -629,13 +628,6 @@ namespace VantaiViet.CoreApi.Data.Migrations
                     b.Property<string>("ProtectedCode")
                         .IsRequired()
                         .HasColumnType("text");
-
-                    b.Property<string>("Purpose")
-                        .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)")
-                        .HasDefaultValue("Verification");
 
                     b.Property<Guid>("RequestKey")
                         .HasColumnType("uuid");
@@ -679,8 +671,6 @@ namespace VantaiViet.CoreApi.Data.Migrations
                             t.HasCheckConstraint("CK_OtpDelivery_Attempts", "\"SendAttempts\" BETWEEN 0 AND 3 AND \"VerifyAttempts\" BETWEEN 0 AND 5");
 
                             t.HasCheckConstraint("CK_OtpDelivery_Channel", "\"Channel\" IN ('Email','Phone')");
-
-                            t.HasCheckConstraint("CK_OtpDelivery_Purpose", "\"Purpose\" IN ('Verification','PasswordReset')");
                         });
                 });
 
@@ -1243,7 +1233,7 @@ namespace VantaiViet.CoreApi.Data.Migrations
                     b.Property<bool>("PhoneNumberConfirmed")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
-                        .HasDefaultValue(false);
+                        .HasDefaultValue(true);
 
                     b.Property<Guid>("RegistrationApplicationId")
                         .HasColumnType("uuid");

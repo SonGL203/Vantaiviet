@@ -1,4 +1,6 @@
 using System.Text;
+using System.Threading.RateLimiting;
+using System.IdentityModel.Tokens.Jwt;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
@@ -22,6 +24,7 @@ internal static class ServiceCollectionExtensions
         services.AddScoped<ICurrentActor, CurrentActor>();
         services.AddScoped<IShipmentService, ShipmentService>();
         services.AddScoped<IBookingService, BookingService>();
+        services.AddScoped<IShipmentBrokerService, ShipmentBrokerService>();
         services.AddScoped<ITripService, TripService>();
         services.AddSignalR();
         services.AddScoped<ITrackingService, TrackingService>();
@@ -55,6 +58,7 @@ internal static class ServiceCollectionExtensions
         services.AddScoped<ISystemInfoService, SystemInfoService>();
         services.AddScoped<IRegistrationService, RegistrationService>();
         services.AddScoped<IAuthService, AuthService>();
+        services.AddScoped<IPasswordRecoveryService, PasswordRecoveryService>();
         services.AddScoped<IOtpService, OtpService>();
         services.AddScoped<INotificationQueueService, NotificationQueueService>();
         if(configuration.GetValue("Notifications:WorkerEnabled",false))
@@ -77,6 +81,16 @@ internal static class ServiceCollectionExtensions
                 options.MapInboundClaims = false;
                 options.Events = new JwtBearerEvents
                 {
+                    OnTokenValidated = async context =>
+                    {
+                        var claims = context.Principal;
+                        if (!Guid.TryParse(claims?.FindFirst(JwtRegisteredClaimNames.Sub)?.Value,out var userId)
+                            || !Guid.TryParse(claims?.FindFirst("sid")?.Value,out var sessionId)
+                            || claims?.FindFirst("security_stamp")?.Value is not string stamp
+                            || !await context.HttpContext.RequestServices.GetRequiredService<IAuthService>()
+                                .IsSessionActiveAsync(userId,sessionId,stamp,context.HttpContext.RequestAborted))
+                        { context.Fail("Session is no longer active."); }
+                    },
                     OnMessageReceived = context =>
                     {
                         if (context.Request.Path.StartsWithSegments("/hubs/tracking"))
@@ -98,6 +112,21 @@ internal static class ServiceCollectionExtensions
                 };
             });
         services.AddAuthorization();
+        services.AddRateLimiter(options =>
+        {
+            options.AddPolicy("auth", context => RateLimitPartition.GetFixedWindowLimiter(
+                context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+                _ => new FixedWindowRateLimiterOptions { PermitLimit=30,Window=TimeSpan.FromMinutes(1),QueueLimit=0 }));
+            options.OnRejected = async (context, ct) =>
+            {
+                context.HttpContext.Response.StatusCode = 429;
+                await context.HttpContext.Response.WriteAsJsonAsync(new ProblemDetails
+                {
+                    Status=429,Title="Too many authentication requests.",
+                    Extensions = { ["errorCode"]="auth.rate_limited",["traceId"]=context.HttpContext.TraceIdentifier }
+                },cancellationToken:ct);
+            };
+        });
         services.AddEndpointsApiExplorer();
         services.AddSwaggerGen(options =>
         {

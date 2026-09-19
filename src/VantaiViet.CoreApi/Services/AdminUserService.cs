@@ -46,6 +46,8 @@ public sealed class AdminUserService(
             throw new InvalidOperationException("Unable to update roles.");
         }
         await AddAuditAsync(actorId, "user.roles_changed", user.Id, cancellationToken);
+        if (!(await userManager.UpdateSecurityStampAsync(user)).Succeeded)
+        { throw new InvalidOperationException("Unable to invalidate old permissions."); }
         return await ToResponseAsync(user, cancellationToken);
     }
 

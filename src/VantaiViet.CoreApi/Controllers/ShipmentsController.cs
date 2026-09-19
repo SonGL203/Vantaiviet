@@ -30,7 +30,8 @@ public sealed class ShipmentsController(IShipmentService service) : ControllerBa
         }
 
         var status=result.ErrorCode switch { "not_found"=>404,"forbidden"=>403,"conflict"=>409,_=>400 };
-        return Problem(statusCode:status,title:"Shipment request rejected.",extensions:new Dictionary<string,object?> {
-            ["errorCode"]="shipment."+result.ErrorCode,["traceId"]=HttpContext.TraceIdentifier });
+        var problem = ProblemDetailsFactory.CreateProblemDetails(HttpContext,statusCode:status,title:"Shipment request rejected.");
+        problem.Extensions["errorCode"] = "shipment." + result.ErrorCode;
+        return new ObjectResult(problem) { StatusCode=status };
     }
 }

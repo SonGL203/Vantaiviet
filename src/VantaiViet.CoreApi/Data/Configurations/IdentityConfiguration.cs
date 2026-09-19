@@ -30,7 +30,7 @@ public sealed class IdentityConfiguration :
         builder.Property(x => x.UserName).IsRequired();
         builder.Property(x => x.NormalizedUserName).IsRequired();
         builder.Property(x => x.PhoneNumber).HasMaxLength(20).IsRequired();
-        builder.Property(x => x.PhoneNumberConfirmed).HasDefaultValue(true);
+        builder.Property(x => x.PhoneNumberConfirmed).HasDefaultValue(false);
         builder.Property(x => x.EmailConfirmed).HasDefaultValue(false);
         builder.Property(x => x.PasswordHash).IsRequired();
         builder.Property(x => x.SecurityStamp).IsRequired();

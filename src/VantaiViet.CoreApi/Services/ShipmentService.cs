@@ -46,7 +46,8 @@ public sealed class ShipmentService(CoreDbContext db, ICurrentActor actor, TimeP
     }
     public async Task<ShipmentResult<ShipmentOwnerResponse>> GetAsync(Guid id, CancellationToken cancellationToken)
     {
-        var s=await db.Shipments.AsNoTracking().SingleOrDefaultAsync(x=>x.Id==id && x.OwnerUserId==actor.UserId,cancellationToken);
+        var s=await db.Shipments.AsNoTracking().SingleOrDefaultAsync(x=>x.Id==id && (x.OwnerUserId==actor.UserId ||
+            db.Set<ShipmentBroker>().Any(a=>a.ShipmentId==id && a.BrokerUserId==actor.UserId && a.Status=="Accepted")),cancellationToken);
         return s is null ? ShipmentResult<ShipmentOwnerResponse>.Fail("not_found") : new(new(Map(s),s.ExternalCustomerName,s.ExternalCustomerPhone));
     }
     public async Task<ShipmentResult<IReadOnlyList<ShipmentResponse>>> ListAsync(bool mine,int page,int pageSize,CancellationToken cancellationToken)

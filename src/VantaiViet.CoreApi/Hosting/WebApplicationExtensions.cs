@@ -24,6 +24,7 @@ internal static class WebApplicationExtensions
         }
         app.UseAuthentication();
         app.UseAuthorization();
+        app.UseRateLimiter();
         app.MapHealthChecks("/health/live", new HealthCheckOptions { Predicate = _ => false });
         app.MapHealthChecks("/health/ready");
         app.MapControllers();

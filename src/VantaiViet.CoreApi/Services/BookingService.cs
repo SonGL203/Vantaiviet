@@ -7,17 +7,8 @@ using VantaiViet.CoreApi.Services.Interfaces;
 namespace VantaiViet.CoreApi.Services;
 public sealed class BookingService(CoreDbContext db, ICurrentActor actor, TimeProvider clock) : IBookingService
 {
-    private async Task<bool> CanManageAsync(Shipment shipment, CancellationToken ct)
-    {
-        var roles = shipment.IsExternalOrder ? new[] { "BROKER" } : new[] { "SHIPPER", "BROKER" };
-        return await (from u in db.Users
-                      join membership in db.UserRoles on u.Id equals membership.UserId
-                      join role in db.Roles on membership.RoleId equals role.Id
-                      where u.Id == actor.UserId && u.Id == shipment.OwnerUserId
-                          && (u.AccountStatus == "Active" || u.AccountStatus == "PendingKyc")
-                          && roles.Contains(role.NormalizedName!)
-                      select u.Id).AnyAsync(ct);
-    }
+    private Task<bool> CanManageAsync(Shipment shipment, CancellationToken ct) =>
+        db.Database.SqlQuery<bool>($"""SELECT public."CanDispatchShipment"({shipment.Id}, {actor.UserId}) AS "Value" """).SingleAsync(ct);
     private static TransportRequestResponse Map(TransportRequest r) => new(r.Id,r.ShipmentId,r.DriverUserId,r.VehicleId,r.Status);
     private async Task<bool> EligibleAsync(Guid driver,Guid vehicle,Shipment shipment,CancellationToken ct)
     {
@@ -60,7 +51,7 @@ public sealed class BookingService(CoreDbContext db, ICurrentActor actor, TimePr
         var q=db.TransportRequests.AsNoTracking();
         if(shipmentId.HasValue)
         {
-            if(!await db.Shipments.AnyAsync(x=>x.Id==shipmentId && x.OwnerUserId==actor.UserId,cancellationToken)) { return ShipmentResult<IReadOnlyList<TransportRequestResponse>>.Fail("not_found"); }
+            if(!await db.Database.SqlQuery<bool>($"""SELECT public."CanDispatchShipment"({shipmentId.Value}, {actor.UserId}) AS "Value" """).SingleAsync(cancellationToken)) { return ShipmentResult<IReadOnlyList<TransportRequestResponse>>.Fail("not_found"); }
             q=q.Where(x=>x.ShipmentId==shipmentId);
         }
         else { q=q.Where(x=>x.DriverUserId==actor.UserId); }
@@ -73,8 +64,8 @@ public sealed class BookingService(CoreDbContext db, ICurrentActor actor, TimePr
         // Lock the shipment before requests so competing confirmations have one winner.
         var shipmentId=await db.TransportRequests.Where(x=>x.Id==requestId).Select(x=>(Guid?)x.ShipmentId).SingleOrDefaultAsync(cancellationToken);
         if(shipmentId is null) { return ShipmentResult<BookingResponse>.Fail("not_found"); }
-        var s=await db.Shipments.FromSqlInterpolated($"""SELECT * FROM public."Shipments" WHERE "Id"={shipmentId.Value} AND "OwnerUserId"={actor.UserId} FOR UPDATE""").SingleOrDefaultAsync(cancellationToken);
-        if(s is null) { return ShipmentResult<BookingResponse>.Fail("not_found"); }
+        var s=await db.Shipments.FromSqlInterpolated($"""SELECT * FROM public."Shipments" WHERE "Id"={shipmentId.Value} FOR UPDATE""").SingleOrDefaultAsync(cancellationToken);
+        if(s is null || !await CanManageAsync(s,cancellationToken)) { return ShipmentResult<BookingResponse>.Fail("not_found"); }
         var r=await db.TransportRequests.FromSqlInterpolated($"""SELECT * FROM public."TransportRequests" WHERE "Id"={requestId} FOR UPDATE""").SingleAsync(cancellationToken);
         var existing=await (from b in db.Bookings join t in db.Trips on b.Id equals t.BookingId
             where b.RequestId==requestId select new BookingResponse(b.Id,b.ShipmentId,b.DriverUserId,b.VehicleId,t.Id,t.Status,b.ConfirmedAt)).SingleOrDefaultAsync(cancellationToken);
@@ -94,6 +85,12 @@ public sealed class BookingService(CoreDbContext db, ICurrentActor actor, TimePr
         var booking=new Booking {Id=Guid.NewGuid(),ShipmentId=s.Id,RequestId=r.Id,OwnerUserId=s.OwnerUserId,DriverUserId=r.DriverUserId,VehicleId=r.VehicleId,ConfirmedAt=clock.GetUtcNow()};
         var trip=new Trip {Id=Guid.NewGuid(),BookingId=booking.Id,DriverUserId=r.DriverUserId,VehicleId=r.VehicleId,CreatedAt=clock.GetUtcNow()};
         db.Bookings.Add(booking);db.Trips.Add(trip);
+        var broker = await db.Set<ShipmentBroker>().SingleOrDefaultAsync(x=>x.ShipmentId==s.Id && x.Status=="Accepted",cancellationToken);
+        if (broker is not null)
+        {
+            db.TripParticipants.Add(new TripParticipant { TripId=trip.Id,UserId=broker.BrokerUserId,
+                GrantedByUserId=s.OwnerUserId,GrantedAt=clock.GetUtcNow() });
+        }
         r.Status="Accepted";s.Status="Booked";s.Version++;s.UpdatedAt=clock.GetUtcNow();
         await db.TransportRequests.Where(x=>x.ShipmentId==s.Id && x.Id!=r.Id && x.Status=="Pending").ExecuteUpdateAsync(x=>x.SetProperty(p=>p.Status,"Rejected"),cancellationToken);
         Audit("transport.accepted",r.Id);
@@ -104,11 +101,12 @@ public sealed class BookingService(CoreDbContext db, ICurrentActor actor, TimePr
     }
     public async Task<ShipmentResult<TransportRequestResponse>> CloseRequestAsync(Guid requestId,bool withdraw,CancellationToken cancellationToken)
     {
-        var q=from r in db.TransportRequests join s in db.Shipments on r.ShipmentId equals s.Id
-            where r.Id==requestId && (withdraw?r.DriverUserId==actor.UserId:s.OwnerUserId==actor.UserId) select r;
-        var request=await q.AsNoTracking().SingleOrDefaultAsync(cancellationToken);
-        if(request is null) { return ShipmentResult<TransportRequestResponse>.Fail("not_found"); }
         await using var tx=await db.Database.BeginTransactionAsync(cancellationToken);
+        var request=await db.TransportRequests.AsNoTracking().SingleOrDefaultAsync(x=>x.Id==requestId,cancellationToken);
+        if(request is null) { return ShipmentResult<TransportRequestResponse>.Fail("not_found"); }
+        var shipment=await db.Shipments.FromSqlInterpolated($"""SELECT * FROM public."Shipments" WHERE "Id"={request.ShipmentId} FOR UPDATE""").SingleAsync(cancellationToken);
+        if (withdraw ? request.DriverUserId!=actor.UserId : !await CanManageAsync(shipment,cancellationToken))
+        { return ShipmentResult<TransportRequestResponse>.Fail("not_found"); }
         var status=withdraw?"Withdrawn":"Rejected";
         var changed=await db.TransportRequests.Where(x=>x.Id==requestId && x.Status=="Pending").ExecuteUpdateAsync(x=>x.SetProperty(r=>r.Status,status),cancellationToken);
         if(changed!=1) { return ShipmentResult<TransportRequestResponse>.Fail("conflict"); }
@@ -120,7 +118,8 @@ public sealed class BookingService(CoreDbContext db, ICurrentActor actor, TimePr
     {
         if(page<1 || page>100000) { return ShipmentResult<IReadOnlyList<BookingResponse>>.Fail("invalid_pagination"); }
         return new(await (from b in db.Bookings.AsNoTracking() join t in db.Trips on b.Id equals t.BookingId
-            where b.OwnerUserId==actor.UserId || b.DriverUserId==actor.UserId
+            where b.OwnerUserId==actor.UserId || b.DriverUserId==actor.UserId ||
+                db.Set<ShipmentBroker>().Any(a=>a.ShipmentId==b.ShipmentId && a.BrokerUserId==actor.UserId && a.Status=="Accepted")
             orderby b.ConfirmedAt descending,b.Id
             select new BookingResponse(b.Id,b.ShipmentId,b.DriverUserId,b.VehicleId,t.Id,t.Status,b.ConfirmedAt))
             .Skip((page-1)*20).Take(20).ToListAsync(cancellationToken));

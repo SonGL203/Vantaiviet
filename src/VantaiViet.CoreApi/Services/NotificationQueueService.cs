@@ -58,7 +58,8 @@ public sealed class NotificationQueueService(CoreDbContext db,TimeProvider clock
                 }
                 else {
                     var code=protection.CreateProtector("VantaiViet.OtpDelivery.v1").Unprotect(row.ProtectedCode);
-                    using var mail=new MailMessage(from,row.Destination){Subject="Vạn Tải Việt - Mã xác thực email",Body=$"Mã xác thực của bạn: {code}. Mã hết hạn sau 5 phút kể từ lúc yêu cầu. Không chia sẻ mã này. Nếu bạn không yêu cầu, hãy bỏ qua email này."};
+                    var purpose = row.Purpose=="PasswordReset" ? "đặt lại mật khẩu" : "xác thực email";
+                    using var mail=new MailMessage(from,row.Destination){Subject=$"Vạn Tải Việt - Mã {purpose}",Body=$"Mã {purpose} của bạn: {code}. Mã hết hạn sau 5 phút kể từ lúc yêu cầu. Không chia sẻ mã này. Nếu bạn không yêu cầu, hãy bỏ qua email này."};
                     using var smtp=new SmtpClient(host,config.GetValue("Notifications:Smtp:Port",587)){EnableSsl=true,UseDefaultCredentials=false};
                     if(!string.IsNullOrWhiteSpace(config["Notifications:Smtp:Username"]))
                     {

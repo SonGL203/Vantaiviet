@@ -48,18 +48,17 @@ public sealed class OtpService(CoreDbContext db,ICurrentActor actor,TimeProvider
         var previous=await db.OtpDeliveries.SingleOrDefaultAsync(x=>x.UserId==actor.UserId&&x.RequestKey==r.RequestKey,ct);
         if(previous is not null)
         {
-            return previous.Channel==r.Channel&&previous.Destination==destination ? new(Map(previous)) : ShipmentResult<OtpStatusDto>.Fail("conflict");
+            return previous.Purpose=="Verification"&&previous.Channel==r.Channel&&previous.Destination==destination ? new(Map(previous)) : ShipmentResult<OtpStatusDto>.Fail("conflict");
         }
 
         var now=clock.GetUtcNow();
-        if(await db.OtpDeliveries.AnyAsync(x=>(x.UserId==actor.UserId||x.Destination==destination)&&x.CreatedAt>now.AddMinutes(-1),ct) ||
-            await db.OtpDeliveries.CountAsync(x=>(x.UserId==actor.UserId||x.Destination==destination)&&x.CreatedAt>now.AddHours(-1),ct)>=5 ||
-            await db.OtpDeliveries.CountAsync(x=>x.CreatedAt>now.AddHours(-1),ct)>=config.GetValue("Notifications:MaxRequestsPerHour",100))
+        var limit = config.GetValue("Notifications:MaxRequestsPerHour",100);
+        if(!await db.Database.SqlQuery<bool>($"""SELECT public."CanQueueOtp"({actor.UserId},{destination},{now},{limit}) AS "Value" """).SingleAsync(ct))
         {
             return ShipmentResult<OtpStatusDto>.Fail("rate_limited");
         }
         // One current challenge per user/channel. Superseded messages are no longer valid.
-        await db.OtpDeliveries.Where(x=>x.UserId==actor.UserId&&x.Channel==r.Channel&&x.ConsumedAt==null)
+        await db.OtpDeliveries.Where(x=>x.UserId==actor.UserId&&x.Purpose=="Verification"&&x.Channel==r.Channel&&x.ConsumedAt==null)
             .ExecuteUpdateAsync(s=>s.SetProperty(x=>x.ConsumedAt,now).SetProperty(x=>x.ProtectedCode,"").SetProperty(x=>x.State,"Superseded"),ct);
         var entry=new OtpDelivery {Id=Guid.NewGuid(),UserId=actor.UserId,RequestKey=r.RequestKey,Channel=r.Channel,Destination=destination,
             ProtectedCode=_protector.Protect(RandomNumberGenerator.GetInt32(1000000).ToString("D6")),Simulated=simulated,
@@ -76,7 +75,7 @@ public sealed class OtpService(CoreDbContext db,ICurrentActor actor,TimeProvider
             return ShipmentResult<OtpStatusDto>.Fail("forbidden");
         }
 
-        var row=await db.OtpDeliveries.AsNoTracking().SingleOrDefaultAsync(x=>x.Id==id&&x.UserId==actor.UserId,ct);
+        var row=await db.OtpDeliveries.AsNoTracking().SingleOrDefaultAsync(x=>x.Id==id&&x.Purpose=="Verification"&&x.UserId==actor.UserId,ct);
         return row is null?ShipmentResult<OtpStatusDto>.Fail("not_found"):new(Map(row));
     }
     public async Task<ShipmentResult<DevelopmentOtpDto>> PreviewAsync(Guid id,CancellationToken ct)
@@ -86,7 +85,7 @@ public sealed class OtpService(CoreDbContext db,ICurrentActor actor,TimeProvider
             return ShipmentResult<DevelopmentOtpDto>.Fail("not_found");
         }
 
-        var row=await db.OtpDeliveries.AsNoTracking().SingleOrDefaultAsync(x=>x.Id==id&&x.UserId==actor.UserId&&x.Simulated&&x.State=="Sent"&&x.ConsumedAt==null&&x.ExpiresAt>clock.GetUtcNow(),ct);
+        var row=await db.OtpDeliveries.AsNoTracking().SingleOrDefaultAsync(x=>x.Id==id&&x.Purpose=="Verification"&&x.UserId==actor.UserId&&x.Simulated&&x.State=="Sent"&&x.ConsumedAt==null&&x.ExpiresAt>clock.GetUtcNow(),ct);
         return row is null?ShipmentResult<DevelopmentOtpDto>.Fail("not_found"):new(new(_protector.Unprotect(row.ProtectedCode),row.ExpiresAt));
     }
     public async Task<ShipmentResult<OtpVerificationDto>> VerifyAsync(Guid id,VerifyOtpDto r,CancellationToken ct)
@@ -99,7 +98,7 @@ public sealed class OtpService(CoreDbContext db,ICurrentActor actor,TimeProvider
         await using var tx=await db.Database.BeginTransactionAsync(ct);
         // Same lock as intake prevents an older request verifying during replacement.
         await db.Database.ExecuteSqlRawAsync("SELECT pg_advisory_xact_lock(74201918)",ct);
-        var row=await db.OtpDeliveries.FromSqlInterpolated($"""SELECT * FROM public."OtpDeliveries" WHERE "Id"={id} AND "UserId"={actor.UserId} FOR UPDATE""").SingleOrDefaultAsync(ct);
+        var row=await db.OtpDeliveries.FromSqlInterpolated($"""SELECT * FROM public."OtpDeliveries" WHERE "Id"={id} AND "UserId"={actor.UserId} AND "Purpose"='Verification' FOR UPDATE""").SingleOrDefaultAsync(ct);
         if(row is null)
         {
             return ShipmentResult<OtpVerificationDto>.Fail("not_found");

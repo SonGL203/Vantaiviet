@@ -19,9 +19,10 @@ public sealed class BookingDatabaseTests
     private sealed record Actor(Guid UserId) : ICurrentActor;
 
     [Theory]
-    [InlineData("SHIPPER", false)]
-    [InlineData("BROKER", true)]
-    public async Task ConcurrentAcceptanceCreatesExactlyOneBookingAndTripAsync(string ownerRole, bool external)
+    [InlineData("SHIPPER", false, false)]
+    [InlineData("BROKER", true, false)]
+    [InlineData("SHIPPER", false, true)]
+    public async Task ConcurrentAcceptanceCreatesExactlyOneBookingAndTripAsync(string ownerRole, bool external, bool delegated)
     {
         var connection = new NpgsqlConnectionStringBuilder(Environment.GetEnvironmentVariable("CORE_DATABASE_TEST_CONNECTION"));
         var database = "booking_test_" + Guid.NewGuid().ToString("N");
@@ -49,6 +50,23 @@ public sealed class BookingDatabaseTests
                 IsExternalOrder=external,ExternalCustomerName=external?"External test customer":null,ExternalCustomerPhone=external?"+84900000999":null };
             db.Shipments.Add(shipment);
             await db.SaveChangesAsync();
+            var dispatcher = owner;
+            if (delegated)
+            {
+                dispatcher = await SeedUserAsync(db,"+84900000105","BROKER");
+                var ownerService = new ShipmentBrokerService(db,new Actor(owner),TimeProvider.System);
+                var brokerService = new ShipmentBrokerService(db,new Actor(dispatcher),TimeProvider.System);
+                var assignment = await ownerService.AssignAsync(shipment.Id,new(dispatcher,shipment.Version),default);
+                Assert.Null(assignment.ErrorCode);
+                Assert.Equal("not_found",(await new BookingService(db,new Actor(dispatcher),TimeProvider.System).ListRequestsAsync(shipment.Id,1,default)).ErrorCode);
+                Assert.Equal("not_found",(await new ShipmentBrokerService(db,new Actor(firstDriver),TimeProvider.System)
+                    .DecideAsync(shipment.Id,"accept",new(shipment.Version),default)).ErrorCode);
+                Assert.Null((await brokerService.DecideAsync(shipment.Id,"accept",new(shipment.Version),default)).ErrorCode);
+                Assert.Null((await ownerService.DecideAsync(shipment.Id,"revoke",new(shipment.Version),default)).ErrorCode);
+                Assert.Equal("not_found",(await new BookingService(db,new Actor(dispatcher),TimeProvider.System).ListRequestsAsync(shipment.Id,1,default)).ErrorCode);
+                Assert.Null((await ownerService.AssignAsync(shipment.Id,new(dispatcher,shipment.Version),default)).ErrorCode);
+                Assert.Null((await brokerService.DecideAsync(shipment.Id,"accept",new(shipment.Version),default)).ErrorCode);
+            }
             var r1 = await new BookingService(db,new Actor(firstDriver),TimeProvider.System).RequestAsync(shipment.Id,new(v1.Id),default);
             Assert.Null(r1.ErrorCode);
             var r2 = await new BookingService(db,new Actor(secondDriver),TimeProvider.System).RequestAsync(shipment.Id,new(v2.Id),default);
@@ -66,12 +84,20 @@ public sealed class BookingDatabaseTests
             await using var a = new CoreDbContext(options);
             await using var b = new CoreDbContext(options);
             var outcomes = await Task.WhenAll(
-                new BookingService(a,new Actor(owner),TimeProvider.System).AcceptAsync(r1.Data!.Id,default),
-                new BookingService(b,new Actor(owner),TimeProvider.System).AcceptAsync(r2.Data!.Id,default));
+                new BookingService(a,new Actor(dispatcher),TimeProvider.System).AcceptAsync(r1.Data!.Id,default),
+                new BookingService(b,new Actor(dispatcher),TimeProvider.System).AcceptAsync(r2.Data!.Id,default));
             Assert.Single(outcomes,x=>x.ErrorCode is null);
             Assert.Single(outcomes,x=>x.ErrorCode=="conflict");
             Assert.Equal(1,await db.Bookings.CountAsync());
             Assert.Equal(1,await db.Trips.CountAsync());
+            db.ChangeTracker.Clear();
+            if (delegated)
+            {
+                Assert.True(await db.TripParticipants.AnyAsync(x=>x.UserId==dispatcher));
+                Assert.Equal(owner,(await db.Bookings.SingleAsync()).OwnerUserId);
+                Assert.Equal("conflict",(await new ShipmentBrokerService(db,new Actor(owner),TimeProvider.System)
+                    .DecideAsync(shipment.Id,"revoke",new(shipment.Version),default)).ErrorCode);
+            }
             db.ChangeTracker.Clear();
             Assert.Equal("Booked",(await db.Shipments.SingleAsync()).Status);
             var accepted = await db.TransportRequests.SingleAsync(x=>x.Status=="Accepted");
@@ -204,6 +230,10 @@ public sealed class BookingDatabaseTests
         await db.Set<TripRoute>().ExecuteUpdateAsync(x => x.SetProperty(r => r.ExpiresAt,DateTimeOffset.UtcNow.AddMinutes(-1)));
         await RequestAsync(owner,delivery);
         Assert.Equal(3,provider.Calls);
+        await db.Set<TripRoute>().ExecuteUpdateAsync(x=>x.SetProperty(r=>r.ResponseJson,(string?)null)
+            .SetProperty(r=>r.ExpiresAt,DateTimeOffset.UtcNow.AddMinutes(-1)).SetProperty(r=>r.LeaseUntil,DateTimeOffset.UtcNow.AddSeconds(-1)));
+        await RequestAsync(owner,delivery);
+        Assert.Equal(4,provider.Calls);
     }
 
     private sealed class TestRouteProvider : ITripRouteService

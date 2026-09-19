@@ -28,6 +28,8 @@ public sealed class TrackingController(ITrackingService service) : ControllerBas
     {
         if(r.ErrorCode is null) { return Ok(ApiResponse<T>.Ok(r.Data!,HttpContext.TraceIdentifier)); }
         var status=r.ErrorCode switch { "not_found"=>404,"forbidden"=>403,"tracking_stopped" or "conflict" or "point_conflict"=>409,_=>400 };
-        return Problem(statusCode:status,title:"Tracking request rejected.",extensions:new Dictionary<string,object?> {["errorCode"]="tracking."+r.ErrorCode,["traceId"]=HttpContext.TraceIdentifier});
+        var problem = ProblemDetailsFactory.CreateProblemDetails(HttpContext,statusCode:status,title:"Tracking request rejected.");
+        problem.Extensions["errorCode"] = "tracking." + r.ErrorCode;
+        return new ObjectResult(problem) { StatusCode=status };
     }
 }

@@ -6,6 +6,8 @@ public sealed class OtpDelivery
     public Guid Id { get; set; }
     public Guid UserId { get; set; }
     public Guid RequestKey { get; set; }
+    public string Purpose { get; set; } = "Verification";
+    public string? CredentialStamp { get; set; }
     public required string Channel { get; set; }
     public required string Destination { get; set; }
     public required string ProtectedCode { get; set; }
