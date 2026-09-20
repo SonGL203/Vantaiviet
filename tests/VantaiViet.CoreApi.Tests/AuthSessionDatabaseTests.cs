@@ -29,8 +29,14 @@ public sealed class AuthSessionDatabaseTests
         public Guid UserId { get; set; }
         public Guid SessionId { get; set; }
     }
-    private static Guid SessionId(AuthResponse response) => Guid.Parse(new JwtSecurityTokenHandler().ReadJwtToken(response.AccessToken).Claims.Single(x=>x.Type=="sid").Value);
-    private static string Stamp(AuthResponse response) => new JwtSecurityTokenHandler().ReadJwtToken(response.AccessToken).Claims.Single(x=>x.Type=="security_stamp").Value;
+    private static Guid SessionId(AuthResponse response)
+    {
+        return Guid.Parse(new JwtSecurityTokenHandler().ReadJwtToken(response.AccessToken).Claims.Single(x=>x.Type=="sid").Value);
+    }
+    private static string Stamp(AuthResponse response)
+    {
+        return new JwtSecurityTokenHandler().ReadJwtToken(response.AccessToken).Claims.Single(x=>x.Type=="security_stamp").Value;
+    }
 
     [PostgreSqlFact]
     public async Task SessionsAndRecoveryRejectReplayAndRevokeOldCredentialsAsync()

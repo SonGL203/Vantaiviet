@@ -117,8 +117,9 @@ public sealed class DriverReviewService(CoreDbContext dbContext, TimeProvider ti
         vehicle.Version++;
     }
 
-    private Task AddAuditAsync(Guid actorUserId, string action, Guid targetId, CancellationToken cancellationToken) =>
-        dbContext.AuditEvents.AddAsync(new AuditEvent
+    private Task AddAuditAsync(Guid actorUserId, string action, Guid targetId, CancellationToken cancellationToken)
+    {
+        return dbContext.AuditEvents.AddAsync(new AuditEvent
         {
             ActorUserId = actorUserId,
             Action = action,
@@ -127,4 +128,5 @@ public sealed class DriverReviewService(CoreDbContext dbContext, TimeProvider ti
             Outcome = "Succeeded",
             OccurredAt = timeProvider.GetUtcNow()
         }, cancellationToken).AsTask();
+    }
 }

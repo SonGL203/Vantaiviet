@@ -114,7 +114,10 @@ public sealed class AuthService(
         return new(response);
     }
 
-    public Task<ShipmentResult<bool>> LogoutAsync(CancellationToken cancellationToken) => RevokeSessionAsync(actor.SessionId,cancellationToken);
+    public Task<ShipmentResult<bool>> LogoutAsync(CancellationToken cancellationToken)
+    {
+        return RevokeSessionAsync(actor.SessionId,cancellationToken);
+    }
 
     public async Task<ShipmentResult<bool>> RevokeSessionAsync(Guid sessionId,CancellationToken cancellationToken)
     {
@@ -128,10 +131,13 @@ public sealed class AuthService(
         return new(true);
     }
 
-    public async Task<ShipmentResult<IReadOnlyList<AuthSessionResponse>>> SessionsAsync(CancellationToken cancellationToken) =>
-        new(await dbContext.AuthSessions.AsNoTracking().Where(x=>x.UserId==actor.UserId && x.RevokedAt==null && x.ExpiresAt>timeProvider.GetUtcNow())
+    public async Task<ShipmentResult<IReadOnlyList<AuthSessionResponse>>> SessionsAsync(CancellationToken cancellationToken)
+    {
+        var sessions = await dbContext.AuthSessions.AsNoTracking().Where(x=>x.UserId==actor.UserId && x.RevokedAt==null && x.ExpiresAt>timeProvider.GetUtcNow())
             .OrderByDescending(x=>x.CreatedAt).ThenBy(x=>x.Id).Take(100)
-            .Select(x=>new AuthSessionResponse(x.Id,x.CreatedAt,x.ExpiresAt,x.Id==actor.SessionId)).ToListAsync(cancellationToken));
+            .Select(x=>new AuthSessionResponse(x.Id,x.CreatedAt,x.ExpiresAt,x.Id==actor.SessionId)).ToListAsync(cancellationToken);
+        return new(sessions);
+    }
 
     public async Task<ShipmentResult<bool>> ChangePasswordAsync(ChangePasswordRequest request,CancellationToken cancellationToken)
     {
@@ -152,14 +158,18 @@ public sealed class AuthService(
         return new(true);
     }
 
-    public Task<bool> IsSessionActiveAsync(Guid userId,Guid sessionId,string securityStamp,CancellationToken cancellationToken) =>
-        (from session in dbContext.AuthSessions join user in dbContext.Users on session.UserId equals user.Id
-         where session.Id==sessionId && user.Id==userId && session.RevokedAt==null && session.ExpiresAt>timeProvider.GetUtcNow()
-            && user.SecurityStamp==securityStamp && (user.AccountStatus=="Active" || user.AccountStatus=="PendingKyc")
-         select session.Id).AnyAsync(cancellationToken);
+    public Task<bool> IsSessionActiveAsync(Guid userId,Guid sessionId,string securityStamp,CancellationToken cancellationToken)
+    {
+        return (from session in dbContext.AuthSessions join user in dbContext.Users on session.UserId equals user.Id
+             where session.Id==sessionId && user.Id==userId && session.RevokedAt==null && session.ExpiresAt>timeProvider.GetUtcNow()
+                && user.SecurityStamp==securityStamp && (user.AccountStatus=="Active" || user.AccountStatus=="PendingKyc")
+             select session.Id).AnyAsync(cancellationToken);
+    }
 
-    private Task<User> LockUserAsync(Guid id,CancellationToken cancellationToken) =>
-        dbContext.Users.FromSqlInterpolated($"""SELECT * FROM public."Users" WHERE "Id"={id} FOR UPDATE""").SingleAsync(cancellationToken);
+    private Task<User> LockUserAsync(Guid id,CancellationToken cancellationToken)
+    {
+        return dbContext.Users.FromSqlInterpolated($"""SELECT * FROM public."Users" WHERE "Id"={id} FOR UPDATE""").SingleAsync(cancellationToken);
+    }
 
     private async Task<AuthResponse> CreateResponseAsync(User user, CancellationToken cancellationToken,Guid? familyId = null)
     {

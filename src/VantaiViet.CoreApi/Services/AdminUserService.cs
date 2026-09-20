@@ -66,10 +66,12 @@ public sealed class AdminUserService(
         return await ToResponseAsync(user, cancellationToken);
     }
 
-    public async Task<IReadOnlyList<AuditEventResponse>> ListAuditEventsAsync(CancellationToken cancellationToken) =>
-        await dbContext.AuditEvents.AsNoTracking().OrderByDescending(x => x.OccurredAt).Take(200)
+    public async Task<IReadOnlyList<AuditEventResponse>> ListAuditEventsAsync(CancellationToken cancellationToken)
+    {
+        return await dbContext.AuditEvents.AsNoTracking().OrderByDescending(x => x.OccurredAt).Take(200)
             .Select(x => new AuditEventResponse(x.Id, x.ActorUserId, x.Action, x.TargetType, x.TargetId, x.Outcome, x.OccurredAt))
             .ToListAsync(cancellationToken);
+    }
 
     private async Task AddAuditAsync(Guid actorId, string action, Guid targetId, CancellationToken cancellationToken)
     {
@@ -80,7 +82,9 @@ public sealed class AdminUserService(
         await dbContext.SaveChangesAsync(cancellationToken);
     }
 
-    private async Task<AdminUserResponse> ToResponseAsync(User user, CancellationToken cancellationToken) =>
-        new(user.Id, user.DisplayName, user.PhoneNumber!, user.AccountStatus,
+    private async Task<AdminUserResponse> ToResponseAsync(User user, CancellationToken cancellationToken)
+    {
+        return new(user.Id, user.DisplayName, user.PhoneNumber!, user.AccountStatus,
             (await userManager.GetRolesAsync(user)).Order().ToList(), user.CreatedAt);
+    }
 }

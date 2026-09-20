@@ -9,9 +9,15 @@ namespace VantaiViet.CoreApi.Controllers;
 public sealed class PasswordRecoveryController(IPasswordRecoveryService service) : ControllerBase
 {
     [HttpPost("forgot-password")]
-    public async Task<IActionResult> RequestAsync(ForgotPasswordRequest request,CancellationToken ct) => Respond(await service.RequestAsync(request,ct));
+    public async Task<IActionResult> RequestAsync(ForgotPasswordRequest request,CancellationToken ct)
+    {
+        return Respond(await service.RequestAsync(request,ct));
+    }
     [HttpPost("reset-password")]
-    public async Task<IActionResult> ResetAsync(ResetPasswordRequest request,CancellationToken ct) => Respond(await service.ResetAsync(request,ct));
+    public async Task<IActionResult> ResetAsync(ResetPasswordRequest request,CancellationToken ct)
+    {
+        return Respond(await service.ResetAsync(request,ct));
+    }
 
     private IActionResult Respond<T>(ShipmentResult<T> result)
     {

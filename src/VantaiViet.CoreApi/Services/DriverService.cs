@@ -8,10 +8,12 @@ namespace VantaiViet.CoreApi.Services;
 
 public sealed class DriverService(CoreDbContext dbContext, TimeProvider timeProvider) : IDriverService
 {
-    public async Task<DriverProfileResponse?> GetProfileAsync(Guid userId, CancellationToken cancellationToken) =>
-        await dbContext.DriverProfiles.AsNoTracking().Where(x => x.UserId == userId)
+    public async Task<DriverProfileResponse?> GetProfileAsync(Guid userId, CancellationToken cancellationToken)
+    {
+        return await dbContext.DriverProfiles.AsNoTracking().Where(x => x.UserId == userId)
             .Select(x => new DriverProfileResponse(x.UserId, x.LicenseClass, x.LicenseExpiresOn, x.Status, x.ReviewNote))
             .SingleOrDefaultAsync(cancellationToken);
+    }
 
     public async Task<DriverProfileResponse> UpsertProfileAsync(Guid userId, UpsertDriverProfileRequest request, CancellationToken cancellationToken)
     {
@@ -35,10 +37,12 @@ public sealed class DriverService(CoreDbContext dbContext, TimeProvider timeProv
         return new DriverProfileResponse(profile.UserId, profile.LicenseClass, profile.LicenseExpiresOn, profile.Status, profile.ReviewNote);
     }
 
-    public async Task<IReadOnlyList<VehicleResponse>> ListVehiclesAsync(Guid userId, CancellationToken cancellationToken) =>
-        await dbContext.Vehicles.AsNoTracking().Where(x => x.DriverUserId == userId).OrderBy(x => x.CreatedAt)
+    public async Task<IReadOnlyList<VehicleResponse>> ListVehiclesAsync(Guid userId, CancellationToken cancellationToken)
+    {
+        return await dbContext.Vehicles.AsNoTracking().Where(x => x.DriverUserId == userId).OrderBy(x => x.CreatedAt)
             .Select(x => new VehicleResponse(x.Id, x.LicensePlate, x.VehicleType, x.MaxPayloadKg, x.Status, x.ReviewNote))
             .ToListAsync(cancellationToken);
+    }
 
     public async Task<VehicleResponse> CreateVehicleAsync(Guid userId, CreateVehicleRequest request, CancellationToken cancellationToken)
     {

@@ -13,5 +13,8 @@ public sealed class TrackingHub(ITrackingService service) : Hub
         { throw new HubException("Access denied."); }
         await Groups.AddToGroupAsync(Context.ConnectionId,tripId.ToString(),Context.ConnectionAborted);
     }
-    public Task LeaveTrip(Guid tripId) => Groups.RemoveFromGroupAsync(Context.ConnectionId,tripId.ToString(),Context.ConnectionAborted);
+    public Task LeaveTrip(Guid tripId)
+    {
+        return Groups.RemoveFromGroupAsync(Context.ConnectionId,tripId.ToString(),Context.ConnectionAborted);
+    }
 }

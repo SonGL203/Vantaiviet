@@ -238,14 +238,18 @@ public sealed class BookingDatabaseTests
 
     private sealed class TestRouteProvider : ITripRouteService
     {
-        public Task<RouteResponse> GetAsync(Guid tripId, CoordinateDto pickup, CoordinateDto delivery, CancellationToken ct) =>
-            Task.FromResult(new RouteResponse("NotConfigured", [], null, null));
+        public Task<RouteResponse> GetAsync(Guid tripId, CoordinateDto pickup, CoordinateDto delivery, CancellationToken ct)
+        {
+            return Task.FromResult(new RouteResponse("NotConfigured", [], null, null));
+        }
     }
 
-    private static TrackingService Tracking(CoreDbContext db, Guid actorId, IServiceProvider provider) =>
-        new(db,new Actor(actorId),TimeProvider.System,provider.GetRequiredService<IHubContext<TrackingHub>>(),
+    private static TrackingService Tracking(CoreDbContext db, Guid actorId, IServiceProvider provider)
+    {
+        return new(db,new Actor(actorId),TimeProvider.System,provider.GetRequiredService<IHubContext<TrackingHub>>(),
             new TestRouteProvider(),new Microsoft.Extensions.Hosting.Internal.HostingEnvironment { EnvironmentName=Environments.Development },
             NullLogger<TrackingService>.Instance);
+    }
 
     private static async Task VerifyTrackingAsync(DbContextOptions<CoreDbContext> options, Guid owner, Guid driver, Guid tripId)
     {

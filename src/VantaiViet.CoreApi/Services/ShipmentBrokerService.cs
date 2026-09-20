@@ -8,10 +8,12 @@ namespace VantaiViet.CoreApi.Services;
 
 public sealed class ShipmentBrokerService(CoreDbContext db, ICurrentActor actor, TimeProvider clock) : IShipmentBrokerService
 {
-    private Task<bool> HasRoleAsync(Guid id,string role,CancellationToken ct) =>
-        (from u in db.Users join ur in db.UserRoles on u.Id equals ur.UserId join r in db.Roles on ur.RoleId equals r.Id
-         where u.Id == id && (u.AccountStatus == "Active" || u.AccountStatus == "PendingKyc") && r.NormalizedName == role
-         select u.Id).AnyAsync(ct);
+    private Task<bool> HasRoleAsync(Guid id,string role,CancellationToken ct)
+    {
+        return (from u in db.Users join ur in db.UserRoles on u.Id equals ur.UserId join r in db.Roles on ur.RoleId equals r.Id
+             where u.Id == id && (u.AccountStatus == "Active" || u.AccountStatus == "PendingKyc") && r.NormalizedName == role
+             select u.Id).AnyAsync(ct);
+    }
 
     public async Task<ShipmentResult<ShipmentBrokerResponse>> AssignAsync(Guid shipmentId,AssignBrokerRequest request,CancellationToken cancellationToken)
     {

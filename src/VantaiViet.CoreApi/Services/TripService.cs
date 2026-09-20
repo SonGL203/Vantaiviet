@@ -7,11 +7,16 @@ namespace VantaiViet.CoreApi.Services;
 public sealed class TripService(CoreDbContext db, ICurrentActor actor, TimeProvider clock) : ITripService
 {
     private enum ActionKind { Start, Pickup, Deliver, Complete, Cancel, Incident }
-    private IQueryable<Trip> Accessible() =>
-        from t in db.Trips join b in db.Bookings on t.BookingId equals b.Id
-        where b.OwnerUserId == actor.UserId || b.DriverUserId == actor.UserId select t;
-    private static TripResponse Map(Trip t) => new(t.Id,t.BookingId,t.DriverUserId,t.VehicleId,t.Status,t.Version,
-        t.StartedAt,t.PickedUpAt,t.DeliveredAt,t.CompletedAt,t.CancelledAt);
+    private IQueryable<Trip> Accessible()
+    {
+        return from t in db.Trips join b in db.Bookings on t.BookingId equals b.Id
+            where b.OwnerUserId == actor.UserId || b.DriverUserId == actor.UserId select t;
+    }
+    private static TripResponse Map(Trip t)
+    {
+        return new(t.Id,t.BookingId,t.DriverUserId,t.VehicleId,t.Status,t.Version,
+            t.StartedAt,t.PickedUpAt,t.DeliveredAt,t.CompletedAt,t.CancelledAt);
+    }
     public async Task<ShipmentResult<TripResponse>> GetAsync(Guid id, CancellationToken cancellationToken)
     {
         var trip = await Accessible().AsNoTracking().SingleOrDefaultAsync(x => x.Id == id,cancellationToken);
@@ -24,12 +29,30 @@ public sealed class TripService(CoreDbContext db, ICurrentActor actor, TimeProvi
         return new(await db.TripEvents.AsNoTracking().Where(x => x.TripId == id).OrderByDescending(x => x.OccurredAt).ThenBy(x => x.Id)
             .Skip((page-1)*20).Take(20).Select(x => new TripEventResponse(x.Id,x.ActorUserId,x.Action,x.Note,x.ProofId,x.OccurredAt)).ToListAsync(cancellationToken));
     }
-    public Task<ShipmentResult<TripResponse>> StartAsync(Guid id,TripVersionRequest r,CancellationToken ct) => ChangeAsync(id,r.Version,ActionKind.Start,null,null,ct);
-    public Task<ShipmentResult<TripResponse>> PickupAsync(Guid id,TripHandoverRequest r,CancellationToken ct) => ChangeAsync(id,r.Version,ActionKind.Pickup,r.ProofId,r.Note,ct);
-    public Task<ShipmentResult<TripResponse>> DeliverAsync(Guid id,TripHandoverRequest r,CancellationToken ct) => ChangeAsync(id,r.Version,ActionKind.Deliver,r.ProofId,r.Note,ct);
-    public Task<ShipmentResult<TripResponse>> CompleteAsync(Guid id,TripVersionRequest r,CancellationToken ct) => ChangeAsync(id,r.Version,ActionKind.Complete,null,null,ct);
-    public Task<ShipmentResult<TripResponse>> CancelAsync(Guid id,TripReasonRequest r,CancellationToken ct) => ChangeAsync(id,r.Version,ActionKind.Cancel,null,r.Reason,ct);
-    public Task<ShipmentResult<TripResponse>> ReportIncidentAsync(Guid id,TripReasonRequest r,CancellationToken ct) => ChangeAsync(id,r.Version,ActionKind.Incident,null,r.Reason,ct);
+    public Task<ShipmentResult<TripResponse>> StartAsync(Guid id,TripVersionRequest r,CancellationToken ct)
+    {
+        return ChangeAsync(id,r.Version,ActionKind.Start,null,null,ct);
+    }
+    public Task<ShipmentResult<TripResponse>> PickupAsync(Guid id,TripHandoverRequest r,CancellationToken ct)
+    {
+        return ChangeAsync(id,r.Version,ActionKind.Pickup,r.ProofId,r.Note,ct);
+    }
+    public Task<ShipmentResult<TripResponse>> DeliverAsync(Guid id,TripHandoverRequest r,CancellationToken ct)
+    {
+        return ChangeAsync(id,r.Version,ActionKind.Deliver,r.ProofId,r.Note,ct);
+    }
+    public Task<ShipmentResult<TripResponse>> CompleteAsync(Guid id,TripVersionRequest r,CancellationToken ct)
+    {
+        return ChangeAsync(id,r.Version,ActionKind.Complete,null,null,ct);
+    }
+    public Task<ShipmentResult<TripResponse>> CancelAsync(Guid id,TripReasonRequest r,CancellationToken ct)
+    {
+        return ChangeAsync(id,r.Version,ActionKind.Cancel,null,r.Reason,ct);
+    }
+    public Task<ShipmentResult<TripResponse>> ReportIncidentAsync(Guid id,TripReasonRequest r,CancellationToken ct)
+    {
+        return ChangeAsync(id,r.Version,ActionKind.Incident,null,r.Reason,ct);
+    }
     private async Task<ShipmentResult<TripResponse>> ChangeAsync(Guid id,long version,ActionKind action,Guid? proofId,string? note,CancellationToken ct)
     {
         var t = await Accessible().SingleOrDefaultAsync(x => x.Id == id,ct);

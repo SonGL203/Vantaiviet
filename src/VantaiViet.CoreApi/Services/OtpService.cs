@@ -13,8 +13,14 @@ public sealed class OtpService(CoreDbContext db,ICurrentActor actor,TimeProvider
     IDataProtectionProvider protection,IHostEnvironment environment,IConfiguration config) : IOtpService
 {
     private readonly IDataProtector _protector=protection.CreateProtector("VantaiViet.OtpDelivery.v1");
-    private static OtpStatusDto Map(OtpDelivery x)=>new(x.Id,x.Channel,x.State,x.ExpiresAt,x.Simulated);
-    private Task<bool> AllowedAsync(CancellationToken ct)=>db.Users.AnyAsync(x=>x.Id==actor.UserId && (x.AccountStatus=="Active"||x.AccountStatus=="PendingKyc"),ct);
+    private static OtpStatusDto Map(OtpDelivery x)
+    {
+        return new(x.Id,x.Channel,x.State,x.ExpiresAt,x.Simulated);
+    }
+    private Task<bool> AllowedAsync(CancellationToken ct)
+    {
+        return db.Users.AnyAsync(x=>x.Id==actor.UserId && (x.AccountStatus=="Active"||x.AccountStatus=="PendingKyc"),ct);
+    }
     public async Task<ShipmentResult<OtpStatusDto>> RequestAsync(RequestOtpDto r,CancellationToken ct)
     {
         if(!await AllowedAsync(ct))

@@ -28,7 +28,7 @@ Các quy tắc này áp dụng cho toàn bộ mã nguồn trong repository. PH�
 - Truyền CancellationToken xuống service.
 - SignalR Hub chỉ xử lý kết nối, kiểm tra quyền tham gia nhóm và chuyển yêu cầu tới service; không CRUD trực tiếp.
 - Worker chỉ nhận/kích hoạt công việc, tạo DI scope, gọi service và quản lý cancellation/acknowledgement. Không chứa thuật toán hoặc truy vấn nghiệp vụ.
-- Không giới hạn số dòng máy móc. Thin được đánh giá bằng trách nhiệm, không phải việc giấu code trong private method.
+- Không giới hạn số dòng máy móc cho controller. Thin được đánh giá bằng trách nhiệm, không phải việc giấu code trong private method. Quy tắc này nói về trách nhiệm của controller và không thay thế ngưỡng độ dài/độ phức tạp của truy vấn ở mục 5.
 
 ## 3. Service
 
@@ -136,6 +136,8 @@ Các quy tắc này áp dụng cho toàn bộ mã nguồn trong repository. PH�
 - PascalCase cho type/method/property; camelCase cho parameter/local; _camelCase cho private instance field; interface tiền tố I.
 - Method async có hậu tố Async; CancellationToken là tham số cuối khi phù hợp.
 - Constructor injection; không service locator hoặc mutable static state.
+- Method dùng thân hàm `{ }` với `return` tường minh; không viết expression-bodied method (`=>`) cho action controller, method service, helper private hay hub method.
+- Giữ nguyên expression-bodied cho property truy cập trực tiếp (`DbSet<T> X => Set<T>();`), factory một dòng của record (`ApiResponse<T>.Ok`), và mọi lambda truyền làm đối số (LINQ, cấu hình DI, switch expression). Đây là biểu thức, không phải thân method.
 - Không magic number, chuỗi trạng thái rải rác, dead code hoặc comment-out code.
 - Comment giải thích lý do. Thống nhất formatting qua .editorconfig khi có mã nguồn.
 - Dùng phiên bản ổn định còn hỗ trợ; không tự nâng major hoặc đưa API preview vào luồng production.

@@ -15,13 +15,21 @@ public sealed class ShipmentService(CoreDbContext db, ICurrentActor actor, TimeP
                 && roles.Contains(r.NormalizedName!)
             select u.Id).AnyAsync(ct);
     }
-    private static ShipmentResponse Map(Shipment s) => new(s.Id,s.Title,s.PickupAddress,s.DeliveryAddress,s.WeightKg,s.PickupAt,s.IsExternalOrder,s.Status,s.Version,
-        s.PickupLatitude.HasValue ? new(s.PickupLatitude.Value,s.PickupLongitude!.Value) : null,
-        s.DeliveryLatitude.HasValue ? new(s.DeliveryLatitude.Value,s.DeliveryLongitude!.Value) : null);
-    private static bool ValidStops(CoordinateDto? pickup, CoordinateDto? delivery) =>
-        (pickup is null && delivery is null) || (ValidCoordinate(pickup) && ValidCoordinate(delivery));
-    private static bool ValidCoordinate(CoordinateDto? p) => p is not null &&
-        double.IsFinite(p.Latitude) && double.IsFinite(p.Longitude) && p.Latitude is >=-90 and <=90 && p.Longitude is >=-180 and <=180;
+    private static ShipmentResponse Map(Shipment s)
+    {
+        return new(s.Id,s.Title,s.PickupAddress,s.DeliveryAddress,s.WeightKg,s.PickupAt,s.IsExternalOrder,s.Status,s.Version,
+            s.PickupLatitude.HasValue ? new(s.PickupLatitude.Value,s.PickupLongitude!.Value) : null,
+            s.DeliveryLatitude.HasValue ? new(s.DeliveryLatitude.Value,s.DeliveryLongitude!.Value) : null);
+    }
+    private static bool ValidStops(CoordinateDto? pickup, CoordinateDto? delivery)
+    {
+        return (pickup is null && delivery is null) || (ValidCoordinate(pickup) && ValidCoordinate(delivery));
+    }
+    private static bool ValidCoordinate(CoordinateDto? p)
+    {
+        return p is not null &&
+            double.IsFinite(p.Latitude) && double.IsFinite(p.Longitude) && p.Latitude is >=-90 and <=90 && p.Longitude is >=-180 and <=180;
+    }
     public async Task<ShipmentResult<ShipmentResponse>> CreateAsync(CreateShipmentRequest r, CancellationToken cancellationToken)
     {
         if(!ValidStops(r.Pickup,r.Delivery)) { return ShipmentResult<ShipmentResponse>.Fail("invalid_coordinates"); }

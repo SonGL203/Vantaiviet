@@ -17,7 +17,10 @@ public sealed class OtpQueueDatabaseTests
     private sealed class Clock:TimeProvider
     {
         public DateTimeOffset Now {get;set;}=DateTimeOffset.UtcNow;
-        public override DateTimeOffset GetUtcNow()=>Now;
+        public override DateTimeOffset GetUtcNow()
+        {
+            return Now;
+        }
     }
     [PostgreSqlFact]
     public async Task QueueDeduplicationLimitsVerificationAndLeaseRecoveryAsync()
@@ -37,7 +40,10 @@ public sealed class OtpQueueDatabaseTests
             db.Users.Add(user);await db.SaveChangesAsync();
             var clock=new Clock();var protection=new EphemeralDataProtectionProvider();
             var config=new ConfigurationBuilder().Build();var env=new HostingEnvironment {EnvironmentName=Environments.Development};
-            OtpService Service(CoreDbContext context,Guid id)=>new(context,new Actor(id),clock,protection,env,config);
+            OtpService Service(CoreDbContext context,Guid id)
+            {
+                return new(context,new Actor(id),clock,protection,env,config);
+            }
             var service=Service(db,user.Id);
             var request=new RequestOtpDto(Guid.NewGuid(),"Email","queue@example.invalid");
             var created=await service.RequestAsync(request,default);Assert.Null(created.ErrorCode);

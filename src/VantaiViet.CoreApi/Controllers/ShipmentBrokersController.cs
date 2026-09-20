@@ -9,15 +9,30 @@ namespace VantaiViet.CoreApi.Controllers;
 public sealed class ShipmentBrokersController(IShipmentBrokerService service) : ControllerBase
 {
     [HttpPost("shipments/{id:guid}/broker")]
-    public async Task<IActionResult> AssignAsync(Guid id,AssignBrokerRequest request,CancellationToken ct) => Respond(await service.AssignAsync(id,request,ct));
+    public async Task<IActionResult> AssignAsync(Guid id,AssignBrokerRequest request,CancellationToken ct)
+    {
+        return Respond(await service.AssignAsync(id,request,ct));
+    }
     [HttpPost("shipments/{id:guid}/broker/accept")]
-    public async Task<IActionResult> AcceptAsync(Guid id,BrokerDecisionRequest request,CancellationToken ct) => Respond(await service.DecideAsync(id,"accept",request,ct));
+    public async Task<IActionResult> AcceptAsync(Guid id,BrokerDecisionRequest request,CancellationToken ct)
+    {
+        return Respond(await service.DecideAsync(id,"accept",request,ct));
+    }
     [HttpPost("shipments/{id:guid}/broker/reject")]
-    public async Task<IActionResult> RejectAsync(Guid id,BrokerDecisionRequest request,CancellationToken ct) => Respond(await service.DecideAsync(id,"reject",request,ct));
+    public async Task<IActionResult> RejectAsync(Guid id,BrokerDecisionRequest request,CancellationToken ct)
+    {
+        return Respond(await service.DecideAsync(id,"reject",request,ct));
+    }
     [HttpPost("shipments/{id:guid}/broker/revoke")]
-    public async Task<IActionResult> RevokeAsync(Guid id,BrokerDecisionRequest request,CancellationToken ct) => Respond(await service.DecideAsync(id,"revoke",request,ct));
+    public async Task<IActionResult> RevokeAsync(Guid id,BrokerDecisionRequest request,CancellationToken ct)
+    {
+        return Respond(await service.DecideAsync(id,"revoke",request,ct));
+    }
     [HttpGet("broker-assignments/mine")]
-    public async Task<IActionResult> ListAsync(CancellationToken ct,int page = 1) => Respond(await service.ListAsync(page,ct));
+    public async Task<IActionResult> ListAsync(CancellationToken ct,int page = 1)
+    {
+        return Respond(await service.ListAsync(page,ct));
+    }
 
     private IActionResult Respond<T>(ShipmentResult<T> result)
     {

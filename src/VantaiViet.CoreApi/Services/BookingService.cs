@@ -7,9 +7,14 @@ using VantaiViet.CoreApi.Services.Interfaces;
 namespace VantaiViet.CoreApi.Services;
 public sealed class BookingService(CoreDbContext db, ICurrentActor actor, TimeProvider clock) : IBookingService
 {
-    private Task<bool> CanManageAsync(Shipment shipment, CancellationToken ct) =>
-        db.Database.SqlQuery<bool>($"""SELECT public."CanDispatchShipment"({shipment.Id}, {actor.UserId}) AS "Value" """).SingleAsync(ct);
-    private static TransportRequestResponse Map(TransportRequest r) => new(r.Id,r.ShipmentId,r.DriverUserId,r.VehicleId,r.Status);
+    private Task<bool> CanManageAsync(Shipment shipment, CancellationToken ct)
+    {
+        return db.Database.SqlQuery<bool>($"""SELECT public."CanDispatchShipment"({shipment.Id}, {actor.UserId}) AS "Value" """).SingleAsync(ct);
+    }
+    private static TransportRequestResponse Map(TransportRequest r)
+    {
+        return new(r.Id,r.ShipmentId,r.DriverUserId,r.VehicleId,r.Status);
+    }
     private async Task<bool> EligibleAsync(Guid driver,Guid vehicle,Shipment shipment,CancellationToken ct)
     {
         var day=DateOnly.FromDateTime(shipment.PickupAt.UtcDateTime);

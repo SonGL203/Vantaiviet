@@ -12,15 +12,30 @@ namespace VantaiViet.CoreApi.Controllers;
 public sealed class AuthController(IAuthService authService) : ControllerBase
 {
     [HttpPost("refresh")]
-    public async Task<IActionResult> RefreshAsync(RefreshSessionRequest request,CancellationToken ct) => Respond(await authService.RefreshAsync(request,ct));
+    public async Task<IActionResult> RefreshAsync(RefreshSessionRequest request,CancellationToken ct)
+    {
+        return Respond(await authService.RefreshAsync(request,ct));
+    }
     [Authorize,HttpPost("logout")]
-    public async Task<IActionResult> LogoutAsync(CancellationToken ct) => Respond(await authService.LogoutAsync(ct));
+    public async Task<IActionResult> LogoutAsync(CancellationToken ct)
+    {
+        return Respond(await authService.LogoutAsync(ct));
+    }
     [Authorize,HttpGet("sessions")]
-    public async Task<IActionResult> SessionsAsync(CancellationToken ct) => Respond(await authService.SessionsAsync(ct));
+    public async Task<IActionResult> SessionsAsync(CancellationToken ct)
+    {
+        return Respond(await authService.SessionsAsync(ct));
+    }
     [Authorize,HttpDelete("sessions/{id:guid}")]
-    public async Task<IActionResult> RevokeAsync(Guid id,CancellationToken ct) => Respond(await authService.RevokeSessionAsync(id,ct));
+    public async Task<IActionResult> RevokeAsync(Guid id,CancellationToken ct)
+    {
+        return Respond(await authService.RevokeSessionAsync(id,ct));
+    }
     [Authorize,HttpPost("change-password")]
-    public async Task<IActionResult> ChangePasswordAsync(ChangePasswordRequest request,CancellationToken ct) => Respond(await authService.ChangePasswordAsync(request,ct));
+    public async Task<IActionResult> ChangePasswordAsync(ChangePasswordRequest request,CancellationToken ct)
+    {
+        return Respond(await authService.ChangePasswordAsync(request,ct));
+    }
 
     private IActionResult Respond<T>(ShipmentResult<T> result)
     {

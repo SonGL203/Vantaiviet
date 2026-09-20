@@ -17,10 +17,11 @@ public sealed class KycReviewController(IKycReviewService kycReviewService) : Co
         CancellationToken cancellationToken,
         string? status = null,
         int page = 1,
-        int pageSize = 20) =>
-        Ok(ApiResponse<IReadOnlyList<KycApplicationListItem>>.Ok(
-            await kycReviewService.ListAsync(status, page, pageSize, cancellationToken),
-            HttpContext.TraceIdentifier));
+        int pageSize = 20)
+    {
+        var applications = await kycReviewService.ListAsync(status, page, pageSize, cancellationToken);
+        return Ok(ApiResponse<IReadOnlyList<KycApplicationListItem>>.Ok(applications, HttpContext.TraceIdentifier));
+    }
 
     [HttpPost("{kycApplicationId:guid}/approve")]
     public async Task<ActionResult<ApiResponse<KycApprovalResponse>>> ApproveAsync(

@@ -12,30 +12,38 @@ namespace VantaiViet.CoreApi.Controllers;
 public sealed class AdminUsersController(IAdminUserService adminUserService) : ControllerBase
 {
     [HttpGet("users")]
-    public async Task<ActionResult<ApiResponse<IReadOnlyList<AdminUserResponse>>>> ListUsersAsync(CancellationToken cancellationToken) =>
-        Ok(ApiResponse<IReadOnlyList<AdminUserResponse>>.Ok(
-            await adminUserService.ListAsync(cancellationToken), HttpContext.TraceIdentifier));
+    public async Task<ActionResult<ApiResponse<IReadOnlyList<AdminUserResponse>>>> ListUsersAsync(CancellationToken cancellationToken)
+    {
+        var users = await adminUserService.ListAsync(cancellationToken);
+        return Ok(ApiResponse<IReadOnlyList<AdminUserResponse>>.Ok(users, HttpContext.TraceIdentifier));
+    }
 
     [HttpPut("users/{userId:guid}/roles")]
     public async Task<ActionResult<ApiResponse<AdminUserResponse>>> SetRolesAsync(
-        Guid userId, SetUserRolesRequest request, CancellationToken cancellationToken) =>
-        Ok(ApiResponse<AdminUserResponse>.Ok(
-            await adminUserService.SetRolesAsync(userId, request, GetActorId(), cancellationToken),
-            HttpContext.TraceIdentifier));
+        Guid userId, SetUserRolesRequest request, CancellationToken cancellationToken)
+    {
+        var user = await adminUserService.SetRolesAsync(userId, request, GetActorId(), cancellationToken);
+        return Ok(ApiResponse<AdminUserResponse>.Ok(user, HttpContext.TraceIdentifier));
+    }
 
     [HttpPut("users/{userId:guid}/status")]
     public async Task<ActionResult<ApiResponse<AdminUserResponse>>> SetStatusAsync(
-        Guid userId, SetAccountStatusRequest request, CancellationToken cancellationToken) =>
-        Ok(ApiResponse<AdminUserResponse>.Ok(
-            await adminUserService.SetStatusAsync(userId, request, GetActorId(), cancellationToken),
-            HttpContext.TraceIdentifier));
+        Guid userId, SetAccountStatusRequest request, CancellationToken cancellationToken)
+    {
+        var user = await adminUserService.SetStatusAsync(userId, request, GetActorId(), cancellationToken);
+        return Ok(ApiResponse<AdminUserResponse>.Ok(user, HttpContext.TraceIdentifier));
+    }
 
     [HttpGet("audit-events")]
-    public async Task<ActionResult<ApiResponse<IReadOnlyList<AuditEventResponse>>>> ListAuditEventsAsync(CancellationToken cancellationToken) =>
-        Ok(ApiResponse<IReadOnlyList<AuditEventResponse>>.Ok(
-            await adminUserService.ListAuditEventsAsync(cancellationToken), HttpContext.TraceIdentifier));
+    public async Task<ActionResult<ApiResponse<IReadOnlyList<AuditEventResponse>>>> ListAuditEventsAsync(CancellationToken cancellationToken)
+    {
+        var events = await adminUserService.ListAuditEventsAsync(cancellationToken);
+        return Ok(ApiResponse<IReadOnlyList<AuditEventResponse>>.Ok(events, HttpContext.TraceIdentifier));
+    }
 
-    private Guid GetActorId() =>
-        Guid.Parse(User.FindFirst(JwtRegisteredClaimNames.Sub)?.Value
+    private Guid GetActorId()
+    {
+        return Guid.Parse(User.FindFirst(JwtRegisteredClaimNames.Sub)?.Value
             ?? throw new UnauthorizedAccessException("Missing user id claim."));
+    }
 }

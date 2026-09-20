@@ -9,15 +9,26 @@ namespace VantaiViet.CoreApi.Services;
 public sealed class TrackingService(CoreDbContext db,ICurrentActor actor,TimeProvider clock,IHubContext<TrackingHub> hub,
     ITripRouteService routing,IHostEnvironment environment,ILogger<TrackingService> logger) : ITrackingService
 {
-    private IQueryable<Trip> Visible(Guid userId) =>
-        from t in db.Trips join b in db.Bookings on t.BookingId equals b.Id
-        join u in db.Users on userId equals u.Id
-        where (u.AccountStatus=="Active" || u.AccountStatus=="PendingKyc") &&
-            (b.OwnerUserId==userId || t.DriverUserId==userId || db.TripParticipants.Any(p=>p.TripId==t.Id && p.UserId==userId))
-        select t;
-    public Task<bool> CanViewAsync(Guid id,Guid authenticatedUserId,CancellationToken ct) => Visible(authenticatedUserId).AnyAsync(x=>x.Id==id,ct);
-    private static bool Sending(string status) => status is TripStates.InProgress or TripStates.Loaded;
-    private static GpsPointResponse Map(TripLocation p) => new(p.Id,p.PointId,p.Latitude,p.Longitude,p.AccuracyMeters,p.RecordedAt,p.ReceivedAt,p.Simulated);
+    private IQueryable<Trip> Visible(Guid userId)
+    {
+        return from t in db.Trips join b in db.Bookings on t.BookingId equals b.Id
+            join u in db.Users on userId equals u.Id
+            where (u.AccountStatus=="Active" || u.AccountStatus=="PendingKyc") &&
+                (b.OwnerUserId==userId || t.DriverUserId==userId || db.TripParticipants.Any(p=>p.TripId==t.Id && p.UserId==userId))
+            select t;
+    }
+    public Task<bool> CanViewAsync(Guid id,Guid authenticatedUserId,CancellationToken ct)
+    {
+        return Visible(authenticatedUserId).AnyAsync(x=>x.Id==id,ct);
+    }
+    private static bool Sending(string status)
+    {
+        return status is TripStates.InProgress or TripStates.Loaded;
+    }
+    private static GpsPointResponse Map(TripLocation p)
+    {
+        return new(p.Id,p.PointId,p.Latitude,p.Longitude,p.AccuracyMeters,p.RecordedAt,p.ReceivedAt,p.Simulated);
+    }
     public async Task<ShipmentResult<IReadOnlyList<TrackingTripResponse>>> ListAsync(int page,CancellationToken cancellationToken)
     {
         if (page<1 || page>100000) { return ShipmentResult<IReadOnlyList<TrackingTripResponse>>.Fail("invalid_pagination"); }
@@ -102,16 +113,21 @@ public sealed class TrackingService(CoreDbContext db,ICurrentActor actor,TimePro
         Audit(id,"tracking.stops_changed");await db.SaveChangesAsync(cancellationToken);await tx.CommitAsync(cancellationToken);
         return new(true);
     }
-    private static bool Valid(CoordinateDto p) => double.IsFinite(p.Latitude) && double.IsFinite(p.Longitude) && p.Latitude is >=-90 and <=90 && p.Longitude is >=-180 and <=180;
+    private static bool Valid(CoordinateDto p)
+    {
+        return double.IsFinite(p.Latitude) && double.IsFinite(p.Longitude) && p.Latitude is >=-90 and <=90 && p.Longitude is >=-180 and <=180;
+    }
     public async Task<ShipmentResult<IReadOnlyList<TrackingParticipantResponse>>> ParticipantsAsync(Guid id,CancellationToken cancellationToken)
     {
         if (!await IsOwnerAsync(id,cancellationToken)) { return ShipmentResult<IReadOnlyList<TrackingParticipantResponse>>.Fail("not_found"); }
         return new(await (from p in db.TripParticipants join u in db.Users on p.UserId equals u.Id where p.TripId==id
             orderby p.UserId select new TrackingParticipantResponse(u.Id,u.DisplayName)).ToListAsync(cancellationToken));
     }
-    private async Task<bool> IsOwnerAsync(Guid id,CancellationToken ct) =>
-        await (from t in Visible(actor.UserId) join b in db.Bookings on t.BookingId equals b.Id
+    private async Task<bool> IsOwnerAsync(Guid id,CancellationToken ct)
+    {
+        return await (from t in Visible(actor.UserId) join b in db.Bookings on t.BookingId equals b.Id
             where t.Id==id && b.OwnerUserId==actor.UserId select t.Id).AnyAsync(ct);
+    }
     public async Task<ShipmentResult<bool>> SetParticipantAsync(Guid id,Guid userId,bool allow,CancellationToken cancellationToken)
     {
         await using var tx=await db.Database.BeginTransactionAsync(cancellationToken);
@@ -131,7 +147,10 @@ public sealed class TrackingService(CoreDbContext db,ICurrentActor actor,TimePro
         await db.SaveChangesAsync(cancellationToken);await tx.CommitAsync(cancellationToken);
         return new(true);
     }
-    private void Audit(Guid id,string action) => db.AuditEvents.Add(new AuditEvent {ActorUserId=actor.UserId,TargetType="Trip",TargetId=id,Action=action,Outcome="Succeeded",OccurredAt=clock.GetUtcNow()});
+    private void Audit(Guid id,string action)
+    {
+        db.AuditEvents.Add(new AuditEvent {ActorUserId=actor.UserId,TargetType="Trip",TargetId=id,Action=action,Outcome="Succeeded",OccurredAt=clock.GetUtcNow()});
+    }
     public async Task<ShipmentResult<RouteResponse>> RouteAsync(Guid id,CancellationToken cancellationToken)
     {
         var snapshot=await SnapshotAsync(id,cancellationToken);
