@@ -8,6 +8,57 @@ namespace VantaiViet.CoreApi.Services;
 public sealed class KycReviewService(CoreDbContext dbContext, TimeProvider timeProvider)
     : IKycReviewService
 {
+    // Draft applications are still being filled in by the applicant, so they are not reviewable yet.
+    private static readonly string[] ListableStatuses = ["Submitted", "UnderReview", "Approved", "Rejected"];
+
+    public async Task<IReadOnlyList<KycApplicationListItem>> ListAsync(
+        string? status,
+        int page,
+        int pageSize,
+        CancellationToken cancellationToken)
+    {
+        if (page < 1 || page > 100000 || pageSize < 1 || pageSize > 100)
+        {
+            throw new InvalidOperationException("Invalid pagination.");
+        }
+
+        var filter = status?.Trim();
+        if (!string.IsNullOrEmpty(filter) && !ListableStatuses.Contains(filter))
+        {
+            throw new InvalidOperationException("Unknown KYC status filter.");
+        }
+
+        var applications = dbContext.KycApplications.AsNoTracking().Where(x => x.Status != "Draft");
+        if (!string.IsNullOrEmpty(filter))
+        {
+            applications = applications.Where(x => x.Status == filter);
+        }
+
+        // Left joins: an application may not have an account or identity details yet.
+        return await (from application in applications
+                      join account in dbContext.Users.AsNoTracking()
+                          on application.RegistrationApplicationId equals account.RegistrationApplicationId into accounts
+                      from user in accounts.DefaultIfEmpty()
+                      join detail in dbContext.KycIdentityDetails.AsNoTracking()
+                          on application.Id equals detail.ApplicationId into details
+                      from identity in details.DefaultIfEmpty()
+                      orderby application.SubmittedAt descending, application.CreatedAt descending, application.Id
+                      select new KycApplicationListItem(
+                          application.Id,
+                          user == null ? (Guid?)null : user.Id,
+                          user == null ? null : user.DisplayName,
+                          user == null ? null : user.PhoneNumber,
+                          identity == null ? null : identity.FullName,
+                          application.Status,
+                          dbContext.KycDocuments.Count(d => d.ApplicationId == application.Id && d.DeletedAt == null),
+                          application.SubmittedAt,
+                          application.ReviewedAt,
+                          application.ReviewNote))
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync(cancellationToken);
+    }
+
     public async Task<KycApprovalResponse> ApproveAsync(
         Guid kycApplicationId,
         Guid reviewerUserId,

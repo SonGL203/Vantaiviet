@@ -11,6 +11,20 @@ namespace VantaiViet.CoreApi.Controllers;
 [Route("api/admin")]
 public sealed class DriverReviewController(IDriverReviewService driverReviewService) : ControllerBase
 {
+    /// <summary>Driver profile review queue. Optional filter: status=Submitted|Approved|Rejected.</summary>
+    [HttpGet("drivers")]
+    public async Task<ActionResult<ApiResponse<IReadOnlyList<DriverProfileListItem>>>> ListDriversAsync(
+        CancellationToken cancellationToken, string? status = null) =>
+        Ok(ApiResponse<IReadOnlyList<DriverProfileListItem>>.Ok(
+            await driverReviewService.ListDriverProfilesAsync(status, cancellationToken), HttpContext.TraceIdentifier));
+
+    /// <summary>Vehicle review queue. Optional filter: status=Submitted|Approved|Rejected.</summary>
+    [HttpGet("vehicles")]
+    public async Task<ActionResult<ApiResponse<IReadOnlyList<VehicleListItem>>>> ListVehiclesAsync(
+        CancellationToken cancellationToken, string? status = null) =>
+        Ok(ApiResponse<IReadOnlyList<VehicleListItem>>.Ok(
+            await driverReviewService.ListVehiclesAsync(status, cancellationToken), HttpContext.TraceIdentifier));
+
     [HttpPut("drivers/{driverUserId:guid}/review")]
     public async Task<ActionResult<ApiResponse<DriverProfileResponse>>> ReviewDriverAsync(Guid driverUserId, ReviewSubmissionRequest request, CancellationToken cancellationToken) =>
         Ok(ApiResponse<DriverProfileResponse>.Ok(

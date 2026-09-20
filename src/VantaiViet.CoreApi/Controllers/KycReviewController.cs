@@ -11,6 +11,17 @@ namespace VantaiViet.CoreApi.Controllers;
 [Route("api/admin/kyc")]
 public sealed class KycReviewController(IKycReviewService kycReviewService) : ControllerBase
 {
+    /// <summary>KYC review queue. Optional filter: status=Submitted|UnderReview|Approved|Rejected.</summary>
+    [HttpGet]
+    public async Task<ActionResult<ApiResponse<IReadOnlyList<KycApplicationListItem>>>> ListAsync(
+        CancellationToken cancellationToken,
+        string? status = null,
+        int page = 1,
+        int pageSize = 20) =>
+        Ok(ApiResponse<IReadOnlyList<KycApplicationListItem>>.Ok(
+            await kycReviewService.ListAsync(status, page, pageSize, cancellationToken),
+            HttpContext.TraceIdentifier));
+
     [HttpPost("{kycApplicationId:guid}/approve")]
     public async Task<ActionResult<ApiResponse<KycApprovalResponse>>> ApproveAsync(
         Guid kycApplicationId,
