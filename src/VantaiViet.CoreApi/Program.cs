@@ -1,5 +1,5 @@
 using VantaiViet.CoreApi.Hosting;
-
+//hello
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddApiFoundation(builder.Configuration);
 builder.Logging.ClearProviders();
