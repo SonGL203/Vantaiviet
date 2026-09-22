@@ -19,6 +19,20 @@ public sealed class CoreDbContext(DbContextOptions<CoreDbContext> options)
     public DbSet<DriverProfile> DriverProfiles => Set<DriverProfile>();
     public DbSet<Vehicle> Vehicles => Set<Vehicle>();
     public DbSet<Shipment> Shipments => Set<Shipment>();
+    public DbSet<ShipmentPhoto> ShipmentPhotos => Set<ShipmentPhoto>();
+    public DbSet<ShipmentMessage> ShipmentMessages => Set<ShipmentMessage>();
+    public DbSet<TripReview> TripReviews => Set<TripReview>();
+    public DbSet<ShipmentIncident> ShipmentIncidents => Set<ShipmentIncident>();
+    public DbSet<UserNotification> UserNotifications => Set<UserNotification>();
+    public DbSet<SavedAddress> SavedAddresses => Set<SavedAddress>();
+    public DbSet<ShipperBusinessProfile> ShipperBusinessProfiles => Set<ShipperBusinessProfile>();
+    public DbSet<BrokerProfile> BrokerProfiles => Set<BrokerProfile>();
+    public DbSet<VehicleAvailability> VehicleAvailabilities => Set<VehicleAvailability>();
+    public DbSet<VehicleProposal> VehicleProposals => Set<VehicleProposal>();
+    public DbSet<SavedDriver> SavedDrivers => Set<SavedDriver>();
+    public DbSet<DriverGroup> DriverGroups => Set<DriverGroup>();
+    public DbSet<DriverReport> DriverReports => Set<DriverReport>();
+    public DbSet<BrokerRouteInterest> BrokerRouteInterests => Set<BrokerRouteInterest>();
     public DbSet<TransportRequest> TransportRequests => Set<TransportRequest>();
     public DbSet<Booking> Bookings => Set<Booking>();
     public DbSet<Trip> Trips => Set<Trip>();
@@ -32,6 +46,7 @@ public sealed class CoreDbContext(DbContextOptions<CoreDbContext> options)
     {
         base.OnModelCreating(modelBuilder);
         modelBuilder.HasDefaultSchema("public");
+        modelBuilder.HasSequence<long>("ShipmentCodes");
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(CoreDbContext).Assembly);
     }
 }

@@ -78,6 +78,14 @@ public sealed class ShipmentBrokerService(CoreDbContext db, ICurrentActor actor,
         shipment.UpdatedAt = assignment.UpdatedAt;
         db.AuditEvents.Add(new AuditEvent { ActorUserId = actor.UserId,TargetType = "Shipment",TargetId = shipment.Id,
             Action = "broker." + action,Outcome = "Succeeded",OccurredAt = assignment.UpdatedAt });
+        var (type, recipient) = action switch
+        {
+            "assigned" => (NotificationTypes.BrokerAssigned, assignment.BrokerUserId),
+            "accept" => (NotificationTypes.BrokerAccepted, shipment.OwnerUserId),
+            "reject" => (NotificationTypes.BrokerRejected, shipment.OwnerUserId),
+            _ => (NotificationTypes.BrokerRevoked, assignment.BrokerUserId)
+        };
+        await NotificationEvents.RaiseAsync(db,clock,type,recipient,shipment.Id,actor.UserId,ct);
         await db.SaveChangesAsync(ct);
         return new(shipment.Id,shipment.Title,assignment.BrokerUserId,assignment.Status,shipment.Version);
     }

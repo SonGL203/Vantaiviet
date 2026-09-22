@@ -18,6 +18,7 @@ public sealed class VehicleConfiguration : IEntityTypeConfiguration<Vehicle>
         builder.Property(x => x.Id).HasDefaultValueSql("gen_random_uuid()");
         builder.Property(x => x.LicensePlate).HasMaxLength(20).IsRequired();
         builder.Property(x => x.VehicleType).HasMaxLength(50).IsRequired();
+        builder.Property(x => x.BodyType).HasMaxLength(50);
         builder.Property(x => x.MaxPayloadKg).HasPrecision(12, 2);
         builder.Property(x => x.Status).HasMaxLength(20).HasDefaultValue("Submitted");
         builder.Property(x => x.ReviewNote).HasMaxLength(1000);

@@ -40,7 +40,7 @@ public sealed class DriverService(CoreDbContext dbContext, TimeProvider timeProv
     public async Task<IReadOnlyList<VehicleResponse>> ListVehiclesAsync(Guid userId, CancellationToken cancellationToken)
     {
         return await dbContext.Vehicles.AsNoTracking().Where(x => x.DriverUserId == userId).OrderBy(x => x.CreatedAt)
-            .Select(x => new VehicleResponse(x.Id, x.LicensePlate, x.VehicleType, x.MaxPayloadKg, x.Status, x.ReviewNote))
+            .Select(x => new VehicleResponse(x.Id, x.LicensePlate, x.VehicleType, x.MaxPayloadKg, x.Status, x.ReviewNote, x.BodyType))
             .ToListAsync(cancellationToken);
     }
 
@@ -51,11 +51,12 @@ public sealed class DriverService(CoreDbContext dbContext, TimeProvider timeProv
             DriverUserId = userId,
             LicensePlate = request.LicensePlate.Trim().ToUpperInvariant(),
             VehicleType = request.VehicleType.Trim(),
-            MaxPayloadKg = request.MaxPayloadKg
+            MaxPayloadKg = request.MaxPayloadKg,
+            BodyType = string.IsNullOrWhiteSpace(request.BodyType) ? null : request.BodyType.Trim()
         };
         dbContext.Vehicles.Add(vehicle);
         await dbContext.SaveChangesAsync(cancellationToken);
-        return new VehicleResponse(vehicle.Id, vehicle.LicensePlate, vehicle.VehicleType, vehicle.MaxPayloadKg, vehicle.Status, vehicle.ReviewNote);
+        return new VehicleResponse(vehicle.Id, vehicle.LicensePlate, vehicle.VehicleType, vehicle.MaxPayloadKg, vehicle.Status, vehicle.ReviewNote, vehicle.BodyType);
     }
 
     public async Task<VehicleResponse> UpdateVehicleAsync(Guid userId, Guid vehicleId, UpdateVehicleRequest request, CancellationToken cancellationToken)
@@ -65,6 +66,7 @@ public sealed class DriverService(CoreDbContext dbContext, TimeProvider timeProv
         vehicle.LicensePlate = request.LicensePlate.Trim().ToUpperInvariant();
         vehicle.VehicleType = request.VehicleType.Trim();
         vehicle.MaxPayloadKg = request.MaxPayloadKg;
+        vehicle.BodyType = string.IsNullOrWhiteSpace(request.BodyType) ? null : request.BodyType.Trim();
         vehicle.Status = "Submitted";
         vehicle.ReviewerUserId = null;
         vehicle.ReviewedAt = null;
@@ -72,7 +74,7 @@ public sealed class DriverService(CoreDbContext dbContext, TimeProvider timeProv
         vehicle.UpdatedAt = timeProvider.GetUtcNow();
         vehicle.Version++;
         await dbContext.SaveChangesAsync(cancellationToken);
-        return new VehicleResponse(vehicle.Id, vehicle.LicensePlate, vehicle.VehicleType, vehicle.MaxPayloadKg, vehicle.Status, vehicle.ReviewNote);
+        return new VehicleResponse(vehicle.Id, vehicle.LicensePlate, vehicle.VehicleType, vehicle.MaxPayloadKg, vehicle.Status, vehicle.ReviewNote, vehicle.BodyType);
     }
 
     public async Task DeleteVehicleAsync(Guid userId, Guid vehicleId, CancellationToken cancellationToken)

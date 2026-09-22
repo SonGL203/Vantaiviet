@@ -61,7 +61,22 @@ public sealed class AuthService(
         {
             throw new InvalidOperationException("Unable to assign the selected account type.");
         }
-        var response = await CreateResponseAsync(user, cancellationToken);
+
+        // A bad or unknown invite code never blocks registration; it is simply not applied (feature 17).
+        if (request.AccountType == "Driver" && Guid.TryParse(request.ReferralCode, out var brokerId))
+        {
+            var isBroker = await (from u in dbContext.Users join ur in dbContext.UserRoles on u.Id equals ur.UserId
+                join r in dbContext.Roles on ur.RoleId equals r.Id
+                where u.Id == brokerId && r.NormalizedName == "BROKER" select u.Id).AnyAsync(cancellationToken);
+            if (isBroker)
+            {
+                user.ReferredByUserId = brokerId;
+                dbContext.SavedDrivers.Add(new SavedDriver { Id = Guid.NewGuid(), BrokerUserId = brokerId, DriverUserId = user.Id, CreatedAt = now, UpdatedAt = now });
+                await dbContext.SaveChangesAsync(cancellationToken);
+            }
+        }
+
+        var response = await CreateResponseAsync(user, cancellationToken, null, request.DeviceName);
         await transaction.CommitAsync(cancellationToken);
         return response;
     }
@@ -84,7 +99,7 @@ public sealed class AuthService(
             throw new UnauthorizedAccessException("This account cannot sign in.");
         }
         await userManager.ResetAccessFailedCountAsync(user);
-        var response = await CreateResponseAsync(user, cancellationToken);
+        var response = await CreateResponseAsync(user, cancellationToken, null, request.DeviceName);
         await transaction.CommitAsync(cancellationToken);
         return response;
     }
@@ -109,7 +124,7 @@ public sealed class AuthService(
         { return ShipmentResult<AuthResponse>.Fail("invalid_credentials"); }
         session.RevokedAt = now;
         session.RevocationReason = "rotated";
-        var response = await CreateResponseAsync(user,cancellationToken,session.FamilyId);
+        var response = await CreateResponseAsync(user,cancellationToken,session.FamilyId,session.DeviceName);
         await transaction.CommitAsync(cancellationToken);
         return new(response);
     }
@@ -135,7 +150,7 @@ public sealed class AuthService(
     {
         var sessions = await dbContext.AuthSessions.AsNoTracking().Where(x=>x.UserId==actor.UserId && x.RevokedAt==null && x.ExpiresAt>timeProvider.GetUtcNow())
             .OrderByDescending(x=>x.CreatedAt).ThenBy(x=>x.Id).Take(100)
-            .Select(x=>new AuthSessionResponse(x.Id,x.CreatedAt,x.ExpiresAt,x.Id==actor.SessionId)).ToListAsync(cancellationToken);
+            .Select(x=>new AuthSessionResponse(x.Id,x.CreatedAt,x.ExpiresAt,x.Id==actor.SessionId,x.DeviceName)).ToListAsync(cancellationToken);
         return new(sessions);
     }
 
@@ -171,7 +186,7 @@ public sealed class AuthService(
         return dbContext.Users.FromSqlInterpolated($"""SELECT * FROM public."Users" WHERE "Id"={id} FOR UPDATE""").SingleAsync(cancellationToken);
     }
 
-    private async Task<AuthResponse> CreateResponseAsync(User user, CancellationToken cancellationToken,Guid? familyId = null)
+    private async Task<AuthResponse> CreateResponseAsync(User user, CancellationToken cancellationToken,Guid? familyId = null,string? deviceName = null)
     {
         var now = timeProvider.GetUtcNow();
         var accessExpiresAt = now.AddMinutes(30);
@@ -181,6 +196,7 @@ public sealed class AuthService(
         {
             Id = Guid.NewGuid(),
             FamilyId = familyId ?? Guid.NewGuid(),
+            DeviceName = string.IsNullOrWhiteSpace(deviceName) ? null : deviceName.Trim(),
             UserId = user.Id,
             CreatedAt = now,
             RefreshTokenHash = SHA256.HashData(Encoding.UTF8.GetBytes(refreshToken)),

@@ -5,6 +5,7 @@ public sealed class KycApplication
     public Guid Id { get; set; }
     public Guid RegistrationApplicationId { get; set; }
     public string Status { get; set; } = "Draft";
+    public string SubjectType { get; set; } = "Individual";
     public DateTimeOffset? SubmittedAt { get; set; }
     public DateTimeOffset? ReviewedAt { get; set; }
     public Guid? ReviewerUserId { get; set; }

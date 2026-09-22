@@ -60,8 +60,6 @@ public sealed class TripsController(ITripService service) : ControllerBase
     }
     private IActionResult Respond<T>(ShipmentResult<T> result)
     {
-        if (result.ErrorCode is null) { return Ok(ApiResponse<T>.Ok(result.Data!,HttpContext.TraceIdentifier)); }
-        var status=result.ErrorCode switch { "not_found"=>404,"forbidden" or "driver_not_eligible"=>403,"conflict" or "invalid_transition"=>409,_=>400 };
-        return Problem(statusCode:status,title:"Trip request rejected.",extensions:new Dictionary<string,object?> {["errorCode"]="trip."+result.ErrorCode,["traceId"]=HttpContext.TraceIdentifier});
+        return this.FromResult(result,"trip");
     }
 }

@@ -15,6 +15,8 @@ namespace VantaiViet.CoreApi.Hosting;
 
 internal static class ServiceCollectionExtensions
 {
+    private const int DefaultAuthPermitLimit = 30;
+
     public static IServiceCollection AddApiFoundation(
         this IServiceCollection services,
         IConfiguration configuration)
@@ -23,8 +25,17 @@ internal static class ServiceCollectionExtensions
         services.AddHttpContextAccessor();
         services.AddScoped<ICurrentActor, CurrentActor>();
         services.AddScoped<IShipmentService, ShipmentService>();
+        services.AddScoped<IShipmentPhotoService, ShipmentPhotoService>();
         services.AddScoped<IBookingService, BookingService>();
         services.AddScoped<IShipmentBrokerService, ShipmentBrokerService>();
+        services.AddScoped<IShipmentCarrierService, ShipmentCarrierService>();
+        services.AddScoped<IShipmentChatService, ShipmentChatService>();
+        services.AddScoped<IShipmentProgressService, ShipmentProgressService>();
+        services.AddScoped<IUserNotificationService, UserNotificationService>();
+        services.AddScoped<IShipmentReviewService, ShipmentReviewService>();
+        services.AddScoped<IShipmentIncidentService, ShipmentIncidentService>();
+        services.AddScoped<IShipmentHistoryService, ShipmentHistoryService>();
+        services.AddScoped<ISavedAddressService, SavedAddressService>();
         services.AddScoped<ITripService, TripService>();
         services.AddSignalR();
         services.AddScoped<ITrackingService, TrackingService>();
@@ -67,6 +78,22 @@ internal static class ServiceCollectionExtensions
         }
 
         services.AddScoped<IKycReviewService, KycReviewService>();
+        services.AddScoped<IAccountProfileService, AccountProfileService>();
+        services.AddScoped<IBusinessProfileService, BusinessProfileService>();
+        services.AddScoped<IBrokerProfileService, BrokerProfileService>();
+        services.AddScoped<IVehicleAvailabilityService, VehicleAvailabilityService>();
+        services.AddScoped<IVehicleProposalService, VehicleProposalService>();
+        services.AddScoped<IDriverNetworkService, DriverNetworkService>();
+        services.AddScoped<IBrokerRevenueService, BrokerRevenueService>();
+        services.AddScoped<IBrokerRouteInterestService, BrokerRouteInterestService>();
+        services.AddScoped<IAccountKycService, AccountKycService>();
+        // Bounded because cache keys come from user-typed search text.
+        services.AddMemoryCache(options => options.SizeLimit = 500);
+        services.AddHttpClient<IGeocodingService, GeocodingService>(client =>
+        {
+            client.Timeout = TimeSpan.FromSeconds(8);
+            client.DefaultRequestHeaders.UserAgent.ParseAdd("VantaiViet/1.0");
+        });
         services.AddScoped<IAdminUserService, AdminUserService>();
         services.AddScoped<IDriverService, DriverService>();
         services.AddScoped<IDriverReviewService, DriverReviewService>();
@@ -116,14 +143,19 @@ internal static class ServiceCollectionExtensions
         {
             options.AddPolicy("auth", context => RateLimitPartition.GetFixedWindowLimiter(
                 context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
-                _ => new FixedWindowRateLimiterOptions { PermitLimit=30,Window=TimeSpan.FromMinutes(1),QueueLimit=0 }));
+                _ => new FixedWindowRateLimiterOptions { PermitLimit=configuration.GetValue("RateLimiting:AuthPermitLimit",DefaultAuthPermitLimit),Window=TimeSpan.FromMinutes(1),QueueLimit=0 }));
+            // Every user shares one outbound address to the public geocoder, so searches are limited per account.
+            options.AddPolicy("geocoding", context => RateLimitPartition.GetFixedWindowLimiter(
+                context.User.FindFirst(JwtRegisteredClaimNames.Sub)?.Value ?? context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+                _ => new FixedWindowRateLimiterOptions { PermitLimit=20,Window=TimeSpan.FromMinutes(1),QueueLimit=0 }));
             options.OnRejected = async (context, ct) =>
             {
                 context.HttpContext.Response.StatusCode = 429;
+                var searching = context.HttpContext.GetEndpoint()?.Metadata.GetMetadata<Microsoft.AspNetCore.RateLimiting.EnableRateLimitingAttribute>()?.PolicyName == "geocoding";
                 await context.HttpContext.Response.WriteAsJsonAsync(new ProblemDetails
                 {
-                    Status=429,Title="Too many authentication requests.",
-                    Extensions = { ["errorCode"]="auth.rate_limited",["traceId"]=context.HttpContext.TraceIdentifier }
+                    Status=429,Title=searching?"Too many address searches.":"Too many authentication requests.",
+                    Extensions = { ["errorCode"]=searching?"geocoding.rate_limited":"auth.rate_limited",["traceId"]=context.HttpContext.TraceIdentifier }
                 },cancellationToken:ct);
             };
         });

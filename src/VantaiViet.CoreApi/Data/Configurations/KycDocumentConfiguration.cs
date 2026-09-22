@@ -10,7 +10,7 @@ public sealed class KycDocumentConfiguration : IEntityTypeConfiguration<KycDocum
     {
         builder.ToTable("KycDocuments", "public", table =>
         {
-            table.HasCheckConstraint("CK_KycDocuments_1", "\"DocumentType\" IN ('IdentityFront','IdentityBack','Selfie')");
+            table.HasCheckConstraint("CK_KycDocuments_1", "\"DocumentType\" IN ('IdentityFront','IdentityBack','Selfie','BusinessLicense')");
             table.HasCheckConstraint("CK_KycDocuments_2", "length(btrim(\"StorageKey\")) > 0");
             table.HasCheckConstraint("CK_KycDocuments_3", "\"SizeBytes\" > 0");
             table.HasCheckConstraint("CK_KycDocuments_4", "\"DeleteAfter\" IS NULL OR \"DeleteAfter\" > \"UploadedAt\"");
@@ -20,6 +20,7 @@ public sealed class KycDocumentConfiguration : IEntityTypeConfiguration<KycDocum
         builder.Property(x => x.Id).HasDefaultValueSql("gen_random_uuid()");
         builder.Property(x => x.DocumentType).HasMaxLength(20);
         builder.Property(x => x.ContentType).HasMaxLength(100);
+        builder.Property(x => x.Content).HasColumnType("bytea");
         builder.Property(x => x.UploadedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
         builder.HasOne<KycApplication>().WithMany().HasForeignKey(x => x.ApplicationId).OnDelete(DeleteBehavior.NoAction);
         builder.HasIndex(x => new { x.ApplicationId, x.DocumentType }).HasDatabaseName("KycDocuments_ApplicationId_DocumentType_key").IsUnique();

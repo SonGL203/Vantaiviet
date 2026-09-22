@@ -8,6 +8,8 @@ public sealed class KycDocument
     public required string StorageKey { get; set; }
     public required string ContentType { get; set; }
     public long SizeBytes { get; set; }
+    // Image bytes stay in the database so a submission commits atomically; cleared when DeletedAt is set.
+    public byte[]? Content { get; set; }
     public DateTimeOffset UploadedAt { get; set; }
     public DateTimeOffset? DeleteAfter { get; set; }
     public DateTimeOffset? DeletedAt { get; set; }

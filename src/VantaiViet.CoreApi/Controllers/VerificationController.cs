@@ -28,13 +28,7 @@ public sealed class VerificationController(IOtpService service) : ControllerBase
     }
     private IActionResult Respond<T>(ShipmentResult<T> r)
     {
-        if (r.ErrorCode is null)
-        {
-            return Ok(ApiResponse<T>.Ok(r.Data!,HttpContext.TraceIdentifier));
-        }
-
-        var status=r.ErrorCode switch {"not_found"=>404,"forbidden"=>403,"conflict"=>409,"rate_limited"=>429,"not_configured"=>503,_=>400};
-        return Problem(statusCode:status,title:"Verification request rejected.",
-            extensions:new Dictionary<string,object?>{["errorCode"]="verification."+r.ErrorCode,["traceId"]=HttpContext.TraceIdentifier});
+        // Problem(extensions: ...) collides with the errorCode that CustomizeProblemDetails already adds and answers 500.
+        return this.FromResult(r,"verification");
     }
 }

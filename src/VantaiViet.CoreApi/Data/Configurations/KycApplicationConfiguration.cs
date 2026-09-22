@@ -16,10 +16,12 @@ public sealed class KycApplicationConfiguration : IEntityTypeConfiguration<KycAp
             table.HasCheckConstraint("CK_KycApplications_4", "\"Status\" <> 'Rejected' OR (\"RejectionCode\" IS NOT NULL AND length(btrim(\"RejectionCode\")) > 0)");
             table.HasCheckConstraint("CK_KycApplications_5", "\"ReviewedAt\" IS NULL OR (\"SubmittedAt\" IS NOT NULL AND \"ReviewedAt\" >= \"SubmittedAt\")");
             table.HasCheckConstraint("CK_KycApplications_6", "\"Version\" > 0");
+            table.HasCheckConstraint("CK_KycApplications_Subject", "\"SubjectType\" IN ('Individual','Business')");
         });
         builder.HasKey(x => x.Id);
         builder.Property(x => x.Id).HasDefaultValueSql("gen_random_uuid()");
         builder.Property(x => x.Status).HasMaxLength(20).HasDefaultValue("Draft");
+        builder.Property(x => x.SubjectType).HasMaxLength(20).HasDefaultValue(KycSubjects.Individual);
         builder.Property(x => x.ReviewerReference).HasMaxLength(200);
         builder.Property(x => x.RejectionCode).HasMaxLength(100);
         builder.Property(x => x.ReviewNote).HasMaxLength(1000);

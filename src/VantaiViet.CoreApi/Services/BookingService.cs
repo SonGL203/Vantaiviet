@@ -45,6 +45,7 @@ public sealed class BookingService(CoreDbContext db, ICurrentActor actor, TimePr
         db.TransportRequests.Add(r);
         s.Version++;
         Audit("transport.requested",r.Id);
+        await NotificationEvents.RaiseAsync(db,clock,NotificationTypes.RequestReceived,s.OwnerUserId,s.Id,actor.UserId,cancellationToken);
         try { await db.SaveChangesAsync(cancellationToken); }
         catch(DbUpdateConcurrencyException) { return ShipmentResult<TransportRequestResponse>.Fail("conflict"); }
         catch(DbUpdateException e) when(e.InnerException is PostgresException {SqlState:PostgresErrorCodes.UniqueViolation}) { return ShipmentResult<TransportRequestResponse>.Fail("conflict"); }
@@ -97,8 +98,14 @@ public sealed class BookingService(CoreDbContext db, ICurrentActor actor, TimePr
                 GrantedByUserId=s.OwnerUserId,GrantedAt=clock.GetUtcNow() });
         }
         r.Status="Accepted";s.Status="Booked";s.Version++;s.UpdatedAt=clock.GetUtcNow();
+        var passedOver=await db.TransportRequests.Where(x=>x.ShipmentId==s.Id && x.Id!=r.Id && x.Status=="Pending").Select(x=>x.DriverUserId).ToListAsync(cancellationToken);
         await db.TransportRequests.Where(x=>x.ShipmentId==s.Id && x.Id!=r.Id && x.Status=="Pending").ExecuteUpdateAsync(x=>x.SetProperty(p=>p.Status,"Rejected"),cancellationToken);
         Audit("transport.accepted",r.Id);
+        await NotificationEvents.RaiseAsync(db,clock,NotificationTypes.RequestAccepted,r.DriverUserId,s.Id,actor.UserId,cancellationToken);
+        foreach (var driverId in passedOver)
+        {
+            await NotificationEvents.RaiseAsync(db,clock,NotificationTypes.RequestRejected,driverId,s.Id,actor.UserId,cancellationToken);
+        }
         try { await db.SaveChangesAsync(cancellationToken);await tx.CommitAsync(cancellationToken); }
         catch(DbUpdateConcurrencyException) { return ShipmentResult<BookingResponse>.Fail("conflict"); }
         catch(DbUpdateException e) when(e.InnerException is PostgresException {SqlState:PostgresErrorCodes.UniqueViolation}) { return ShipmentResult<BookingResponse>.Fail("resource_unavailable"); }
@@ -116,6 +123,8 @@ public sealed class BookingService(CoreDbContext db, ICurrentActor actor, TimePr
         var changed=await db.TransportRequests.Where(x=>x.Id==requestId && x.Status=="Pending").ExecuteUpdateAsync(x=>x.SetProperty(r=>r.Status,status),cancellationToken);
         if(changed!=1) { return ShipmentResult<TransportRequestResponse>.Fail("conflict"); }
         Audit(withdraw?"transport.withdrawn":"transport.rejected",requestId);
+        await NotificationEvents.RaiseAsync(db,clock,withdraw ? NotificationTypes.RequestWithdrawn : NotificationTypes.RequestRejected,
+            withdraw ? shipment.OwnerUserId : request.DriverUserId,shipment.Id,actor.UserId,cancellationToken);
         await db.SaveChangesAsync(cancellationToken);await tx.CommitAsync(cancellationToken);
         request.Status=status;return new(Map(request));
     }

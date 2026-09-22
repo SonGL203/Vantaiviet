@@ -23,6 +23,8 @@ namespace VantaiViet.CoreApi.Data.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.HasSequence("ShipmentCodes");
+
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRole<System.Guid>", b =>
                 {
                     b.Property<Guid>("Id")
@@ -326,6 +328,106 @@ namespace VantaiViet.CoreApi.Data.Migrations
                         });
                 });
 
+            modelBuilder.Entity("VantaiViet.CoreApi.Entities.BrokerProfile", b =>
+                {
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("OperatingArea")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasDefaultValue(1L);
+
+                    b.Property<int>("YearsExperience")
+                        .HasColumnType("integer");
+
+                    b.HasKey("UserId");
+
+                    b.ToTable("BrokerProfiles", "public", t =>
+                        {
+                            t.HasCheckConstraint("CK_BrokerProfiles_OperatingArea", "length(btrim(\"OperatingArea\")) > 0");
+
+                            t.HasCheckConstraint("CK_BrokerProfiles_Version", "\"Version\" > 0");
+
+                            t.HasCheckConstraint("CK_BrokerProfiles_YearsExperience", "\"YearsExperience\" >= 0");
+                        });
+                });
+
+            modelBuilder.Entity("VantaiViet.CoreApi.Entities.BrokerRouteInterest", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("BrokerUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("FromArea")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("ToArea")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BrokerUserId")
+                        .HasDatabaseName("IX_BrokerRouteInterests_Broker");
+
+                    b.ToTable("BrokerRouteInterests", "public", t =>
+                        {
+                            t.HasCheckConstraint("CK_BrokerRouteInterests_FromArea", "length(btrim(\"FromArea\")) > 0");
+
+                            t.HasCheckConstraint("CK_BrokerRouteInterests_ToArea", "length(btrim(\"ToArea\")) > 0");
+                        });
+                });
+
+            modelBuilder.Entity("VantaiViet.CoreApi.Entities.DriverGroup", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("BrokerUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BrokerUserId")
+                        .HasDatabaseName("IX_DriverGroups_Broker");
+
+                    b.ToTable("DriverGroups", "public", t =>
+                        {
+                            t.HasCheckConstraint("CK_DriverGroups_Name", "length(btrim(\"Name\")) > 0");
+                        });
+                });
+
             modelBuilder.Entity("VantaiViet.CoreApi.Entities.DriverProfile", b =>
                 {
                     b.Property<Guid>("UserId")
@@ -384,6 +486,43 @@ namespace VantaiViet.CoreApi.Data.Migrations
                         });
                 });
 
+            modelBuilder.Entity("VantaiViet.CoreApi.Entities.DriverReport", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Category")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<Guid>("DriverUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ReporterUserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DriverUserId");
+
+                    b.HasIndex("ReporterUserId", "CreatedAt");
+
+                    b.ToTable("DriverReports", "public", t =>
+                        {
+                            t.HasCheckConstraint("CK_DriverReport_Category", "\"Category\" IN ('NoShow','Misconduct','UnsafeDriving','Other')");
+                        });
+                });
+
             modelBuilder.Entity("VantaiViet.CoreApi.Entities.KycApplication", b =>
                 {
                     b.Property<Guid>("Id")
@@ -423,6 +562,13 @@ namespace VantaiViet.CoreApi.Data.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)")
                         .HasDefaultValue("Draft");
+
+                    b.Property<string>("SubjectType")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasDefaultValue("Individual");
 
                     b.Property<DateTimeOffset?>("SubmittedAt")
                         .HasColumnType("timestamp with time zone");
@@ -464,6 +610,8 @@ namespace VantaiViet.CoreApi.Data.Migrations
                             t.HasCheckConstraint("CK_KycApplications_5", "\"ReviewedAt\" IS NULL OR (\"SubmittedAt\" IS NOT NULL AND \"ReviewedAt\" >= \"SubmittedAt\")");
 
                             t.HasCheckConstraint("CK_KycApplications_6", "\"Version\" > 0");
+
+                            t.HasCheckConstraint("CK_KycApplications_Subject", "\"SubjectType\" IN ('Individual','Business')");
                         });
                 });
 
@@ -476,6 +624,9 @@ namespace VantaiViet.CoreApi.Data.Migrations
 
                     b.Property<Guid>("ApplicationId")
                         .HasColumnType("uuid");
+
+                    b.Property<byte[]>("Content")
+                        .HasColumnType("bytea");
 
                     b.Property<string>("ContentType")
                         .IsRequired()
@@ -517,7 +668,7 @@ namespace VantaiViet.CoreApi.Data.Migrations
 
                     b.ToTable("KycDocuments", "public", t =>
                         {
-                            t.HasCheckConstraint("CK_KycDocuments_1", "\"DocumentType\" IN ('IdentityFront','IdentityBack','Selfie')");
+                            t.HasCheckConstraint("CK_KycDocuments_1", "\"DocumentType\" IN ('IdentityFront','IdentityBack','Selfie','BusinessLicense')");
 
                             t.HasCheckConstraint("CK_KycDocuments_2", "length(btrim(\"StorageKey\")) > 0");
 
@@ -787,13 +938,145 @@ namespace VantaiViet.CoreApi.Data.Migrations
                         });
                 });
 
+            modelBuilder.Entity("VantaiViet.CoreApi.Entities.SavedAddress", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<string>("Address")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Label")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)");
+
+                    b.Property<double?>("Latitude")
+                        .HasColumnType("double precision");
+
+                    b.Property<double?>("Longitude")
+                        .HasColumnType("double precision");
+
+                    b.Property<Guid>("OwnerUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasDefaultValue(1L);
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OwnerUserId", "Label")
+                        .IsUnique();
+
+                    b.ToTable("SavedAddresses", "public", t =>
+                        {
+                            t.HasCheckConstraint("CK_SavedAddresses_Point", "(\"Latitude\" IS NULL AND \"Longitude\" IS NULL) OR (\"Latitude\" BETWEEN -90 AND 90 AND \"Longitude\" BETWEEN -180 AND 180)");
+                        });
+                });
+
+            modelBuilder.Entity("VantaiViet.CoreApi.Entities.SavedDriver", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("BrokerUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("DriverUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("GroupId")
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("IsFavorite")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasDefaultValue(1L);
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DriverUserId");
+
+                    b.HasIndex("GroupId")
+                        .HasDatabaseName("IX_SavedDrivers_Group");
+
+                    b.HasIndex("BrokerUserId", "DriverUserId")
+                        .IsUnique()
+                        .HasDatabaseName("IX_SavedDrivers_Broker_Driver");
+
+                    b.ToTable("SavedDrivers", "public", t =>
+                        {
+                            t.HasCheckConstraint("CK_SavedDrivers_Version", "\"Version\" > 0");
+                        });
+                });
+
             modelBuilder.Entity("VantaiViet.CoreApi.Entities.Shipment", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<decimal?>("BrokerCommissionRate")
+                        .HasPrecision(5, 2)
+                        .HasColumnType("numeric(5,2)");
+
+                    b.Property<string>("CargoDescription")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<string>("CargoType")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasDefaultValue("General");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(12)
+                        .HasColumnType("character varying(12)")
+                        .HasDefaultValueSql("'VT' || lpad(nextval('public.\"ShipmentCodes\"')::text, 7, '0')");
+
                     b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)")
+                        .HasDefaultValue("VND");
+
+                    b.Property<DateTimeOffset?>("DeliverByAt")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("DeliveryAddress")
@@ -818,6 +1101,10 @@ namespace VantaiViet.CoreApi.Data.Migrations
                     b.Property<bool>("IsExternalOrder")
                         .HasColumnType("boolean");
 
+                    b.Property<string>("Notes")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
                     b.Property<Guid>("OwnerUserId")
                         .HasColumnType("uuid");
 
@@ -835,6 +1122,22 @@ namespace VantaiViet.CoreApi.Data.Migrations
                     b.Property<double?>("PickupLongitude")
                         .HasColumnType("double precision");
 
+                    b.Property<decimal?>("ProposedPrice")
+                        .HasPrecision(15)
+                        .HasColumnType("numeric(15,0)");
+
+                    b.Property<int>("Quantity")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(1);
+
+                    b.Property<string>("QuantityUnit")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasDefaultValue("Package");
+
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(20)
@@ -848,6 +1151,13 @@ namespace VantaiViet.CoreApi.Data.Migrations
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<string>("VehicleType")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasDefaultValue("Any");
+
                     b.Property<long>("Version")
                         .IsConcurrencyToken()
                         .HasColumnType("bigint");
@@ -858,13 +1168,32 @@ namespace VantaiViet.CoreApi.Data.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("Code")
+                        .IsUnique();
+
                     b.HasIndex("OwnerUserId", "CreatedAt");
 
                     b.HasIndex("Status", "CreatedAt");
 
                     b.ToTable("Shipments", "public", t =>
                         {
+                            t.HasCheckConstraint("CK_Shipment_BrokerCommissionRate", "\"BrokerCommissionRate\" IS NULL OR (\"BrokerCommissionRate\" >= 0 AND \"BrokerCommissionRate\" <= 100)");
+
+                            t.HasCheckConstraint("CK_Shipment_CargoType", "\"CargoType\" IN ('General','Food','Refrigerated','Agricultural','Construction','Machinery','Furniture','Electronics','Textile','Chemical','Other')");
+
+                            t.HasCheckConstraint("CK_Shipment_Currency", "\"Currency\" = 'VND'");
+
+                            t.HasCheckConstraint("CK_Shipment_DeliverBy", "\"DeliverByAt\" IS NULL OR \"DeliverByAt\" > \"PickupAt\"");
+
+                            t.HasCheckConstraint("CK_Shipment_ProposedPrice", "\"ProposedPrice\" IS NULL OR \"ProposedPrice\" > 0");
+
+                            t.HasCheckConstraint("CK_Shipment_Quantity", "\"Quantity\" BETWEEN 1 AND 1000000");
+
+                            t.HasCheckConstraint("CK_Shipment_QuantityUnit", "\"QuantityUnit\" IN ('Piece','Package','Box','Pallet','Bag','Roll','Drum')");
+
                             t.HasCheckConstraint("CK_Shipment_Status", "\"Status\" IN ('Draft','Published','Cancelled','Booked','Completed')");
+
+                            t.HasCheckConstraint("CK_Shipment_VehicleType", "\"VehicleType\" IN ('Any','Van','SmallTruck','MediumTruck','HeavyTruck','Refrigerated','Tractor','Container','Tanker')");
 
                             t.HasCheckConstraint("CK_Shipment_Weight", "\"WeightKg\" > 0");
                         });
@@ -893,6 +1222,178 @@ namespace VantaiViet.CoreApi.Data.Migrations
                     b.ToTable("ShipmentBrokers", "public", t =>
                         {
                             t.HasCheckConstraint("CK_ShipmentBrokers_Status", "\"Status\" IN ('Pending','Accepted','Rejected','Revoked')");
+                        });
+                });
+
+            modelBuilder.Entity("VantaiViet.CoreApi.Entities.ShipmentIncident", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<string>("Category")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<Guid>("ReporterUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ShipmentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasDefaultValue("Open");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ReporterUserId");
+
+                    b.HasIndex("ShipmentId", "CreatedAt");
+
+                    b.ToTable("ShipmentIncidents", "public", t =>
+                        {
+                            t.HasCheckConstraint("CK_ShipmentIncidents_Category", "\"Category\" IN ('DamagedCargo','MissingCargo','Late','DriverConduct','WrongDelivery','Accident','Other')");
+
+                            t.HasCheckConstraint("CK_ShipmentIncidents_Status", "\"Status\" IN ('Open')");
+                        });
+                });
+
+            modelBuilder.Entity("VantaiViet.CoreApi.Entities.ShipmentMessage", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Body")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<Guid>("CarrierUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("SenderUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("SentAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("ShipmentId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CarrierUserId");
+
+                    b.HasIndex("SenderUserId");
+
+                    b.HasIndex("ShipmentId", "CarrierUserId", "Id");
+
+                    b.ToTable("ShipmentMessages", "public", t =>
+                        {
+                            t.HasCheckConstraint("CK_ShipmentMessages_Body", "char_length(\"Body\") BETWEEN 1 AND 1000");
+                        });
+                });
+
+            modelBuilder.Entity("VantaiViet.CoreApi.Entities.ShipmentPhoto", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<byte[]>("Content")
+                        .IsRequired()
+                        .HasColumnType("bytea");
+
+                    b.Property<string>("ContentType")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<Guid>("ShipmentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("SizeBytes")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ShipmentId", "CreatedAt");
+
+                    b.ToTable("ShipmentPhotos", "public", t =>
+                        {
+                            t.HasCheckConstraint("CK_ShipmentPhotos_ContentType", "\"ContentType\" IN ('image/jpeg','image/png')");
+
+                            t.HasCheckConstraint("CK_ShipmentPhotos_SizeBytes", "\"SizeBytes\" > 0");
+                        });
+                });
+
+            modelBuilder.Entity("VantaiViet.CoreApi.Entities.ShipperBusinessProfile", b =>
+                {
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Address")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("CompanyName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("TaxCode")
+                        .IsRequired()
+                        .HasMaxLength(14)
+                        .HasColumnType("character varying(14)");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasDefaultValue(1L);
+
+                    b.HasKey("UserId");
+
+                    b.HasIndex("TaxCode")
+                        .HasDatabaseName("IX_ShipperBusinessProfiles_TaxCode");
+
+                    b.ToTable("ShipperBusinessProfiles", "public", t =>
+                        {
+                            t.HasCheckConstraint("CK_ShipperBusinessProfiles_TaxCode", "\"TaxCode\" ~ '^[0-9]{10}(-[0-9]{3})?$'");
+
+                            t.HasCheckConstraint("CK_ShipperBusinessProfiles_Text", "length(btrim(\"CompanyName\")) > 0 AND length(btrim(\"Address\")) > 0");
+
+                            t.HasCheckConstraint("CK_ShipperBusinessProfiles_Version", "\"Version\" > 0");
                         });
                 });
 
@@ -1145,6 +1646,41 @@ namespace VantaiViet.CoreApi.Data.Migrations
                         });
                 });
 
+            modelBuilder.Entity("VantaiViet.CoreApi.Entities.TripReview", b =>
+                {
+                    b.Property<Guid>("TripId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("TargetUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Comment")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("ReviewerUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Stars")
+                        .HasColumnType("integer");
+
+                    b.HasKey("TripId", "TargetUserId");
+
+                    b.HasIndex("ReviewerUserId");
+
+                    b.HasIndex("TargetUserId", "CreatedAt");
+
+                    b.ToTable("TripReviews", "public", t =>
+                        {
+                            t.HasCheckConstraint("CK_TripReviews_Comment", "\"Comment\" IS NULL OR char_length(\"Comment\") <= 500");
+
+                            t.HasCheckConstraint("CK_TripReviews_Stars", "\"Stars\" BETWEEN 1 AND 5");
+                        });
+                });
+
             modelBuilder.Entity("VantaiViet.CoreApi.Entities.TripRoute", b =>
                 {
                     b.Property<Guid>("TripId")
@@ -1245,6 +1781,9 @@ namespace VantaiViet.CoreApi.Data.Migrations
                         .HasColumnType("boolean")
                         .HasDefaultValue(false);
 
+                    b.Property<Guid?>("ReferredByUserId")
+                        .HasColumnType("uuid");
+
                     b.Property<Guid>("RegistrationApplicationId")
                         .HasColumnType("uuid");
 
@@ -1282,6 +1821,9 @@ namespace VantaiViet.CoreApi.Data.Migrations
                         .IsUnique()
                         .HasDatabaseName("Users_PhoneNumber_key");
 
+                    b.HasIndex("ReferredByUserId")
+                        .HasDatabaseName("IX_Users_ReferredByUserId");
+
                     b.HasIndex("RegistrationApplicationId")
                         .IsUnique()
                         .HasDatabaseName("Users_RegistrationApplicationId_key");
@@ -1300,12 +1842,61 @@ namespace VantaiViet.CoreApi.Data.Migrations
                         });
                 });
 
+            modelBuilder.Entity("VantaiViet.CoreApi.Entities.UserNotification", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("ActorName")
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset?>("ReadAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("RelatedUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("ShipmentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Subject")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId", "Id");
+
+                    b.HasIndex("UserId", "ReadAt");
+
+                    b.ToTable("UserNotifications", "public");
+                });
+
             modelBuilder.Entity("VantaiViet.CoreApi.Entities.Vehicle", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid")
                         .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<string>("BodyType")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
 
                     b.Property<DateTimeOffset>("CreatedAt")
                         .ValueGeneratedOnAdd()
@@ -1373,6 +1964,151 @@ namespace VantaiViet.CoreApi.Data.Migrations
                             t.HasCheckConstraint("CK_Vehicles_Status", "\"Status\" IN ('Submitted','Approved','Rejected')");
 
                             t.HasCheckConstraint("CK_Vehicles_Version", "\"Version\" > 0");
+                        });
+                });
+
+            modelBuilder.Entity("VantaiViet.CoreApi.Entities.VehicleAvailability", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("AvailableFrom")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("DriverUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("FromAddress")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<bool>("IsReturnTrip")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("ToAddress")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("VehicleId")
+                        .HasColumnType("uuid");
+
+                    b.Property<long>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasDefaultValue(1L);
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DriverUserId")
+                        .HasDatabaseName("IX_VehicleAvailabilities_Driver");
+
+                    b.HasIndex("VehicleId");
+
+                    b.HasIndex("Status", "ExpiresAt")
+                        .HasDatabaseName("IX_VehicleAvailabilities_Search");
+
+                    b.ToTable("VehicleAvailabilities", "public", t =>
+                        {
+                            t.HasCheckConstraint("CK_VehicleAvailabilities_Expiry", "\"ExpiresAt\" > \"AvailableFrom\"");
+
+                            t.HasCheckConstraint("CK_VehicleAvailabilities_Status", "\"Status\" IN ('Open','Withdrawn','Matched')");
+
+                            t.HasCheckConstraint("CK_VehicleAvailabilities_Text", "length(btrim(\"FromAddress\")) > 0 AND length(btrim(\"ToAddress\")) > 0");
+
+                            t.HasCheckConstraint("CK_VehicleAvailabilities_Version", "\"Version\" > 0");
+                        });
+                });
+
+            modelBuilder.Entity("VantaiViet.CoreApi.Entities.VehicleProposal", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("BrokerUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal?>("CounterPrice")
+                        .HasPrecision(15)
+                        .HasColumnType("numeric(15,0)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("DriverUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("ProposedPrice")
+                        .HasPrecision(15)
+                        .HasColumnType("numeric(15,0)");
+
+                    b.Property<Guid>("ShipmentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("VehicleAvailabilityId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("VehicleId")
+                        .HasColumnType("uuid");
+
+                    b.Property<long>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasDefaultValue(1L);
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ShipmentId");
+
+                    b.HasIndex("VehicleAvailabilityId")
+                        .HasDatabaseName("IX_VehicleProposals_Availability");
+
+                    b.HasIndex("VehicleId");
+
+                    b.HasIndex("BrokerUserId", "Status")
+                        .HasDatabaseName("IX_VehicleProposals_Broker");
+
+                    b.HasIndex("DriverUserId", "Status")
+                        .HasDatabaseName("IX_VehicleProposals_Driver");
+
+                    b.ToTable("VehicleProposals", "public", t =>
+                        {
+                            t.HasCheckConstraint("CK_VehicleProposals_Price", "\"ProposedPrice\" > 0 AND (\"CounterPrice\" IS NULL OR \"CounterPrice\" > 0)");
+
+                            t.HasCheckConstraint("CK_VehicleProposals_Status", "\"Status\" IN ('Pending','CounterOffered','Accepted','Rejected','Withdrawn')");
+
+                            t.HasCheckConstraint("CK_VehicleProposals_Version", "\"Version\" > 0");
                         });
                 });
 
@@ -1557,6 +2293,33 @@ namespace VantaiViet.CoreApi.Data.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("VantaiViet.CoreApi.Entities.BrokerProfile", b =>
+                {
+                    b.HasOne("VantaiViet.CoreApi.Entities.User", null)
+                        .WithOne()
+                        .HasForeignKey("VantaiViet.CoreApi.Entities.BrokerProfile", "UserId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("VantaiViet.CoreApi.Entities.BrokerRouteInterest", b =>
+                {
+                    b.HasOne("VantaiViet.CoreApi.Entities.User", null)
+                        .WithMany()
+                        .HasForeignKey("BrokerUserId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("VantaiViet.CoreApi.Entities.DriverGroup", b =>
+                {
+                    b.HasOne("VantaiViet.CoreApi.Entities.User", null)
+                        .WithMany()
+                        .HasForeignKey("BrokerUserId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("VantaiViet.CoreApi.Entities.DriverProfile", b =>
                 {
                     b.HasOne("VantaiViet.CoreApi.Entities.User", null)
@@ -1567,6 +2330,21 @@ namespace VantaiViet.CoreApi.Data.Migrations
                     b.HasOne("VantaiViet.CoreApi.Entities.User", null)
                         .WithMany()
                         .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("VantaiViet.CoreApi.Entities.DriverReport", b =>
+                {
+                    b.HasOne("VantaiViet.CoreApi.Entities.User", null)
+                        .WithMany()
+                        .HasForeignKey("DriverUserId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+
+                    b.HasOne("VantaiViet.CoreApi.Entities.User", null)
+                        .WithMany()
+                        .HasForeignKey("ReporterUserId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired();
                 });
@@ -1621,6 +2399,35 @@ namespace VantaiViet.CoreApi.Data.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("VantaiViet.CoreApi.Entities.SavedAddress", b =>
+                {
+                    b.HasOne("VantaiViet.CoreApi.Entities.User", null)
+                        .WithMany()
+                        .HasForeignKey("OwnerUserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("VantaiViet.CoreApi.Entities.SavedDriver", b =>
+                {
+                    b.HasOne("VantaiViet.CoreApi.Entities.User", null)
+                        .WithMany()
+                        .HasForeignKey("BrokerUserId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+
+                    b.HasOne("VantaiViet.CoreApi.Entities.User", null)
+                        .WithMany()
+                        .HasForeignKey("DriverUserId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+
+                    b.HasOne("VantaiViet.CoreApi.Entities.DriverGroup", null)
+                        .WithMany()
+                        .HasForeignKey("GroupId")
+                        .OnDelete(DeleteBehavior.SetNull);
+                });
+
             modelBuilder.Entity("VantaiViet.CoreApi.Entities.Shipment", b =>
                 {
                     b.HasOne("VantaiViet.CoreApi.Entities.User", null)
@@ -1642,6 +2449,60 @@ namespace VantaiViet.CoreApi.Data.Migrations
                         .WithOne()
                         .HasForeignKey("VantaiViet.CoreApi.Entities.ShipmentBroker", "ShipmentId")
                         .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("VantaiViet.CoreApi.Entities.ShipmentIncident", b =>
+                {
+                    b.HasOne("VantaiViet.CoreApi.Entities.User", null)
+                        .WithMany()
+                        .HasForeignKey("ReporterUserId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+
+                    b.HasOne("VantaiViet.CoreApi.Entities.Shipment", null)
+                        .WithMany()
+                        .HasForeignKey("ShipmentId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("VantaiViet.CoreApi.Entities.ShipmentMessage", b =>
+                {
+                    b.HasOne("VantaiViet.CoreApi.Entities.User", null)
+                        .WithMany()
+                        .HasForeignKey("CarrierUserId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+
+                    b.HasOne("VantaiViet.CoreApi.Entities.User", null)
+                        .WithMany()
+                        .HasForeignKey("SenderUserId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+
+                    b.HasOne("VantaiViet.CoreApi.Entities.Shipment", null)
+                        .WithMany()
+                        .HasForeignKey("ShipmentId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("VantaiViet.CoreApi.Entities.ShipmentPhoto", b =>
+                {
+                    b.HasOne("VantaiViet.CoreApi.Entities.Shipment", null)
+                        .WithMany()
+                        .HasForeignKey("ShipmentId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("VantaiViet.CoreApi.Entities.ShipperBusinessProfile", b =>
+                {
+                    b.HasOne("VantaiViet.CoreApi.Entities.User", null)
+                        .WithOne()
+                        .HasForeignKey("VantaiViet.CoreApi.Entities.ShipperBusinessProfile", "UserId")
+                        .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired();
                 });
 
@@ -1752,6 +2613,27 @@ namespace VantaiViet.CoreApi.Data.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("VantaiViet.CoreApi.Entities.TripReview", b =>
+                {
+                    b.HasOne("VantaiViet.CoreApi.Entities.User", null)
+                        .WithMany()
+                        .HasForeignKey("ReviewerUserId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+
+                    b.HasOne("VantaiViet.CoreApi.Entities.User", null)
+                        .WithMany()
+                        .HasForeignKey("TargetUserId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+
+                    b.HasOne("VantaiViet.CoreApi.Entities.Trip", null)
+                        .WithMany()
+                        .HasForeignKey("TripId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("VantaiViet.CoreApi.Entities.TripRoute", b =>
                 {
                     b.HasOne("VantaiViet.CoreApi.Entities.Trip", null)
@@ -1763,10 +2645,24 @@ namespace VantaiViet.CoreApi.Data.Migrations
 
             modelBuilder.Entity("VantaiViet.CoreApi.Entities.User", b =>
                 {
+                    b.HasOne("VantaiViet.CoreApi.Entities.User", null)
+                        .WithMany()
+                        .HasForeignKey("ReferredByUserId")
+                        .OnDelete(DeleteBehavior.NoAction);
+
                     b.HasOne("VantaiViet.CoreApi.Entities.RegistrationApplication", null)
                         .WithMany()
                         .HasForeignKey("RegistrationApplicationId")
                         .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("VantaiViet.CoreApi.Entities.UserNotification", b =>
+                {
+                    b.HasOne("VantaiViet.CoreApi.Entities.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
 
@@ -1782,6 +2678,54 @@ namespace VantaiViet.CoreApi.Data.Migrations
                         .WithMany()
                         .HasForeignKey("ReviewerUserId")
                         .OnDelete(DeleteBehavior.NoAction);
+                });
+
+            modelBuilder.Entity("VantaiViet.CoreApi.Entities.VehicleAvailability", b =>
+                {
+                    b.HasOne("VantaiViet.CoreApi.Entities.User", null)
+                        .WithMany()
+                        .HasForeignKey("DriverUserId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+
+                    b.HasOne("VantaiViet.CoreApi.Entities.Vehicle", null)
+                        .WithMany()
+                        .HasForeignKey("VehicleId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("VantaiViet.CoreApi.Entities.VehicleProposal", b =>
+                {
+                    b.HasOne("VantaiViet.CoreApi.Entities.User", null)
+                        .WithMany()
+                        .HasForeignKey("BrokerUserId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+
+                    b.HasOne("VantaiViet.CoreApi.Entities.User", null)
+                        .WithMany()
+                        .HasForeignKey("DriverUserId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+
+                    b.HasOne("VantaiViet.CoreApi.Entities.Shipment", null)
+                        .WithMany()
+                        .HasForeignKey("ShipmentId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+
+                    b.HasOne("VantaiViet.CoreApi.Entities.VehicleAvailability", null)
+                        .WithMany()
+                        .HasForeignKey("VehicleAvailabilityId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+
+                    b.HasOne("VantaiViet.CoreApi.Entities.Vehicle", null)
+                        .WithMany()
+                        .HasForeignKey("VehicleId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("VantaiViet.CoreApi.Entities.VerificationChallenge", b =>

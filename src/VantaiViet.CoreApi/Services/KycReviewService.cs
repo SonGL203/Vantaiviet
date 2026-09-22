@@ -91,4 +91,51 @@ public sealed class KycReviewService(CoreDbContext dbContext, TimeProvider timeP
         await transaction.CommitAsync(cancellationToken);
         return new KycApprovalResponse(application.Id, user.Id, application.Status, user.AccountStatus, now);
     }
+
+    public async Task<KycApprovalResponse> RejectAsync(
+        Guid kycApplicationId,
+        Guid reviewerUserId,
+        RejectKycRequest request,
+        CancellationToken cancellationToken)
+    {
+        var rejectionCode = request.RejectionCode.Trim();
+        if (rejectionCode.Length == 0)
+        {
+            throw new InvalidOperationException("A rejection code is required.");
+        }
+
+        var now = timeProvider.GetUtcNow();
+        await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
+        var application = await dbContext.KycApplications.SingleOrDefaultAsync(
+            x => x.Id == kycApplicationId,
+            cancellationToken) ?? throw new InvalidOperationException("KYC application was not found.");
+        if (application.Status is not ("Submitted" or "UnderReview"))
+        {
+            throw new InvalidOperationException("Only submitted KYC applications can be rejected.");
+        }
+
+        var user = await dbContext.Users.SingleAsync(
+            x => x.RegistrationApplicationId == application.RegistrationApplicationId,
+            cancellationToken);
+        application.Status = "Rejected";
+        application.ReviewedAt = now;
+        application.ReviewerUserId = reviewerUserId;
+        application.ReviewerReference = reviewerUserId.ToString();
+        application.RejectionCode = rejectionCode;
+        application.ReviewNote = request.ReviewNote?.Trim();
+        application.UpdatedAt = now;
+        application.Version++;
+        dbContext.AuditEvents.Add(new Entities.AuditEvent
+        {
+            ActorUserId = reviewerUserId,
+            Action = "kyc.rejected",
+            TargetType = "KycApplication",
+            TargetId = application.Id,
+            Outcome = "Succeeded",
+            OccurredAt = now
+        });
+        await dbContext.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        return new KycApprovalResponse(application.Id, user.Id, application.Status, user.AccountStatus, now);
+    }
 }

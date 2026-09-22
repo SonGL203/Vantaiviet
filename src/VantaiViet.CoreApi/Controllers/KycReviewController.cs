@@ -39,4 +39,21 @@ public sealed class KycReviewController(IKycReviewService kycReviewService) : Co
             kycApplicationId, reviewerUserId, request, cancellationToken);
         return Ok(ApiResponse<KycApprovalResponse>.Ok(response, HttpContext.TraceIdentifier));
     }
+
+    [HttpPost("{kycApplicationId:guid}/reject")]
+    public async Task<ActionResult<ApiResponse<KycApprovalResponse>>> RejectAsync(
+        Guid kycApplicationId,
+        RejectKycRequest request,
+        CancellationToken cancellationToken)
+    {
+        var reviewerId = User.FindFirst(JwtRegisteredClaimNames.Sub)?.Value;
+        if (!Guid.TryParse(reviewerId, out var reviewerUserId))
+        {
+            return Unauthorized();
+        }
+
+        var response = await kycReviewService.RejectAsync(
+            kycApplicationId, reviewerUserId, request, cancellationToken);
+        return Ok(ApiResponse<KycApprovalResponse>.Ok(response, HttpContext.TraceIdentifier));
+    }
 }

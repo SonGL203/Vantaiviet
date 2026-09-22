@@ -38,7 +38,7 @@ public sealed class ShipmentDatabaseTests
         Assert.Null(edited.ErrorCode);
         shipment=Assert.IsType<ShipmentResponse>(edited.Data);
         Assert.Equal(request.Pickup,shipment.Pickup);
-        Assert.Equal(request.Delivery,(await service.ListAsync(true,1,100,default)).Data?.Single(x=>x.Id==shipment.Id).Delivery);
+        Assert.Equal(request.Delivery,(await service.ListAsync(true,1,100,null,null,default)).Data?.Single(x=>x.Id==shipment.Id).Delivery);
         var stranger = new ShipmentService(db, new Actor(Guid.NewGuid()), TimeProvider.System);
         Assert.Equal("not_found", (await stranger.GetAsync(shipment.Id, default)).ErrorCode);
         Assert.Equal("not_found", (await stranger.TransitionAsync(shipment.Id, "cancel", shipment.Version, default)).ErrorCode);

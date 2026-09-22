@@ -112,6 +112,16 @@ public sealed class TripService(CoreDbContext db, ICurrentActor actor, TimeProvi
             booking.Status=t.Status;
         }
         t.Version++;
+        var type = action switch
+        {
+            ActionKind.Start => NotificationTypes.TripStarted,
+            ActionKind.Pickup => NotificationTypes.TripPickedUp,
+            ActionKind.Deliver => NotificationTypes.TripDelivered,
+            ActionKind.Complete => NotificationTypes.TripCompleted,
+            ActionKind.Cancel => NotificationTypes.TripCancelled,
+            _ => NotificationTypes.TripIncident
+        };
+        await NotificationEvents.RaiseAsync(db,clock,type,actor.UserId == booking.OwnerUserId ? t.DriverUserId : booking.OwnerUserId,booking.ShipmentId,actor.UserId,ct);
         db.TripEvents.Add(new TripEvent {Id=Guid.NewGuid(),TripId=id,ActorUserId=actor.UserId,Action=action.ToString(),Note=note?.Trim(),ProofId=proofId,OccurredAt=now});
         db.AuditEvents.Add(new AuditEvent {ActorUserId=actor.UserId,TargetType="Trip",TargetId=id,Action="trip."+action.ToString().ToLowerInvariant(),Outcome="Succeeded",OccurredAt=now});
         try { await db.SaveChangesAsync(ct); }

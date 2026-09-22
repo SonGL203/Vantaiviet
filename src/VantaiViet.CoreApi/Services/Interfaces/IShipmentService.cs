@@ -4,7 +4,10 @@ public interface IShipmentService
 {
     Task<ShipmentResult<ShipmentResponse>> CreateAsync(CreateShipmentRequest request, CancellationToken cancellationToken);
     Task<ShipmentResult<ShipmentOwnerResponse>> GetAsync(Guid id, CancellationToken cancellationToken);
-    Task<ShipmentResult<IReadOnlyList<ShipmentResponse>>> ListAsync(bool mine, int page, int pageSize, CancellationToken cancellationToken);
+    Task<ShipmentResult<IReadOnlyList<ShipmentResponse>>> ListAsync(bool mine, int page, int pageSize, string? search, string? status, CancellationToken cancellationToken);
     Task<ShipmentResult<ShipmentResponse>> UpdateAsync(Guid id, UpdateShipmentRequest request, CancellationToken cancellationToken);
+    Task<ShipmentResult<ShipmentSummaryResponse>> SummaryAsync(CancellationToken cancellationToken);
+    Task<ShipmentResult<ShipmentResponse>> CloneAsync(Guid id, CloneShipmentRequest request, bool repost, CancellationToken cancellationToken);
     Task<ShipmentResult<ShipmentResponse>> TransitionAsync(Guid id, string action, long version, CancellationToken cancellationToken);
+    Task<ShipmentResult<IReadOnlyList<FrequentRouteResponse>>> FrequentRoutesAsync(int take, CancellationToken cancellationToken);
 }
