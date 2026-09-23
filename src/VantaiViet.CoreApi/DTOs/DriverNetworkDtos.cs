@@ -23,9 +23,19 @@ public sealed record InviteCodeResponse(string Code);
 
 public sealed record ReferredDriverResponse(Guid UserId, string DisplayName, string Phone, DateTimeOffset JoinedAt);
 
-/// <summary>Feature 23: a broker flags a driver for admin attention (no moderation queue yet).</summary>
+/// <summary>Feature 23: a broker flags a driver for admin attention; an admin then reviews it (batch 6).</summary>
 public sealed record DriverReportRequest(
     [param: Required] string Category,
     [param: Required, StringLength(1000, MinimumLength = 3)] string Description);
 
-public sealed record DriverReportResponse(Guid Id, Guid DriverUserId, string DriverDisplayName, string Category, string Description, DateTimeOffset CreatedAt);
+public sealed record DriverReportResponse(Guid Id, Guid DriverUserId, string DriverDisplayName, string Category, string Description, string Status, DateTimeOffset CreatedAt);
+
+/// <summary>The admin queue's own listing: also carries who reported, and how it was resolved if it was.</summary>
+public sealed record DriverReportListItem(
+    Guid Id, Guid ReporterUserId, string? ReporterDisplayName, Guid DriverUserId, string? DriverDisplayName,
+    string Category, string Description, string Status, Guid? ReviewerUserId, DateTimeOffset? ReviewedAt, string? ReviewNote, DateTimeOffset CreatedAt);
+
+/// <summary><see cref="Status"/> must be "Reviewed" or "Dismissed" — an admin can only resolve a report, never reopen one back to "Open".</summary>
+public sealed record DriverReportReviewRequest(
+    [param: Required] string Status,
+    [param: StringLength(1000)] string? ReviewNote);

@@ -129,4 +129,67 @@ public sealed class DriverReviewService(CoreDbContext dbContext, TimeProvider ti
             OccurredAt = timeProvider.GetUtcNow()
         }, cancellationToken).AsTask();
     }
+
+    public async Task<IReadOnlyList<DriverReportListItem>> ListDriverReportsAsync(string? status, CancellationToken cancellationToken)
+    {
+        var filter = status?.Trim();
+        if (string.IsNullOrEmpty(filter))
+        {
+            filter = null;
+        }
+        else if (!DriverReportStatuses.All.Contains(filter))
+        {
+            throw new InvalidOperationException("Unknown driver-report status filter.");
+        }
+
+        var reports = dbContext.DriverReports.AsNoTracking().AsQueryable();
+        if (filter is not null)
+        {
+            reports = reports.Where(x => x.Status == filter);
+        }
+
+        return await (from report in reports
+                      join reporterAccount in dbContext.Users.AsNoTracking() on report.ReporterUserId equals reporterAccount.Id into reporters
+                      from reporter in reporters.DefaultIfEmpty()
+                      join driverAccount in dbContext.Users.AsNoTracking() on report.DriverUserId equals driverAccount.Id into drivers
+                      from driver in drivers.DefaultIfEmpty()
+                      orderby report.CreatedAt descending
+                      select new DriverReportListItem(
+                          report.Id,
+                          report.ReporterUserId,
+                          reporter == null ? null : reporter.DisplayName,
+                          report.DriverUserId,
+                          driver == null ? null : driver.DisplayName,
+                          report.Category,
+                          report.Description,
+                          report.Status,
+                          report.ReviewerUserId,
+                          report.ReviewedAt,
+                          report.ReviewNote,
+                          report.CreatedAt))
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<DriverReportListItem> ReviewDriverReportAsync(Guid reportId, Guid reviewerUserId, DriverReportReviewRequest request, CancellationToken cancellationToken)
+    {
+        if (request.Status is not (DriverReportStatuses.Reviewed or DriverReportStatuses.Dismissed))
+        {
+            throw new InvalidOperationException("A driver report can only be resolved as Reviewed or Dismissed.");
+        }
+
+        var report = await dbContext.DriverReports.SingleOrDefaultAsync(x => x.Id == reportId, cancellationToken)
+            ?? throw new InvalidOperationException("Driver report was not found.");
+        var now = timeProvider.GetUtcNow();
+        report.Status = request.Status;
+        report.ReviewerUserId = reviewerUserId;
+        report.ReviewedAt = now;
+        report.ReviewNote = string.IsNullOrWhiteSpace(request.ReviewNote) ? null : request.ReviewNote.Trim();
+        await AddAuditAsync(reviewerUserId, "driver_report.reviewed", reportId, cancellationToken);
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        var reporterName = await dbContext.Users.AsNoTracking().Where(x => x.Id == report.ReporterUserId).Select(x => (string?)x.DisplayName).SingleOrDefaultAsync(cancellationToken);
+        var driverName = await dbContext.Users.AsNoTracking().Where(x => x.Id == report.DriverUserId).Select(x => (string?)x.DisplayName).SingleOrDefaultAsync(cancellationToken);
+        return new DriverReportListItem(report.Id, report.ReporterUserId, reporterName, report.DriverUserId, driverName,
+            report.Category, report.Description, report.Status, report.ReviewerUserId, report.ReviewedAt, report.ReviewNote, report.CreatedAt);
+    }
 }

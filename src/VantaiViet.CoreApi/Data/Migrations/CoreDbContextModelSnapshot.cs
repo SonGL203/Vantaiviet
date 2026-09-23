@@ -511,15 +511,38 @@ namespace VantaiViet.CoreApi.Data.Migrations
                     b.Property<Guid>("ReporterUserId")
                         .HasColumnType("uuid");
 
+                    b.Property<string>("ReviewNote")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<DateTimeOffset?>("ReviewedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("ReviewerUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasDefaultValue("Open");
+
                     b.HasKey("Id");
 
                     b.HasIndex("DriverUserId");
+
+                    b.HasIndex("ReviewerUserId");
+
+                    b.HasIndex("Status");
 
                     b.HasIndex("ReporterUserId", "CreatedAt");
 
                     b.ToTable("DriverReports", "public", t =>
                         {
                             t.HasCheckConstraint("CK_DriverReport_Category", "\"Category\" IN ('NoShow','Misconduct','UnsafeDriving','Other')");
+
+                            t.HasCheckConstraint("CK_DriverReport_Status", "\"Status\" IN ('Open','Reviewed','Dismissed')");
                         });
                 });
 
@@ -2347,6 +2370,11 @@ namespace VantaiViet.CoreApi.Data.Migrations
                         .HasForeignKey("ReporterUserId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired();
+
+                    b.HasOne("VantaiViet.CoreApi.Entities.User", null)
+                        .WithMany()
+                        .HasForeignKey("ReviewerUserId")
+                        .OnDelete(DeleteBehavior.NoAction);
                 });
 
             modelBuilder.Entity("VantaiViet.CoreApi.Entities.KycApplication", b =>

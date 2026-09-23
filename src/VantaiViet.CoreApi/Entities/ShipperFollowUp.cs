@@ -103,6 +103,8 @@ public static class NotificationTypes
     public const string SavedDriverAvailable = "saved_driver.available";
     // "Có hàng phù hợp": a new shipment was just published on a route the broker watches.
     public const string MatchingCargoAvailable = "cargo.available";
+    // "Có xe phù hợp": a driver just posted a truck whose route/vehicle type matches one of the broker's own open shipments.
+    public const string MatchingVehicleAvailable = "vehicle.available";
 }
 
 public static class FollowUpLimits

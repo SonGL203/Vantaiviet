@@ -8,14 +8,23 @@ public sealed class DriverReportConfiguration : IEntityTypeConfiguration<DriverR
 {
     public void Configure(EntityTypeBuilder<DriverReport> b)
     {
-        b.ToTable("DriverReports", "public", t => t.HasCheckConstraint("CK_DriverReport_Category",
-            $"\"Category\" IN ({string.Join(",", DriverReportCategories.All.Select(x => $"'{x}'"))})"));
+        b.ToTable("DriverReports", "public", t =>
+        {
+            t.HasCheckConstraint("CK_DriverReport_Category",
+                $"\"Category\" IN ({string.Join(",", DriverReportCategories.All.Select(x => $"'{x}'"))})");
+            t.HasCheckConstraint("CK_DriverReport_Status",
+                $"\"Status\" IN ({string.Join(",", DriverReportStatuses.All.Select(x => $"'{x}'"))})");
+        });
         b.HasKey(x => x.Id);
         b.Property(x => x.Category).HasMaxLength(20);
         b.Property(x => x.Description).HasMaxLength(1000);
+        b.Property(x => x.Status).HasMaxLength(20).HasDefaultValue(DriverReportStatuses.Open);
+        b.Property(x => x.ReviewNote).HasMaxLength(1000);
         b.HasOne<User>().WithMany().HasForeignKey(x => x.ReporterUserId).OnDelete(DeleteBehavior.NoAction);
         b.HasOne<User>().WithMany().HasForeignKey(x => x.DriverUserId).OnDelete(DeleteBehavior.NoAction);
+        b.HasOne<User>().WithMany().HasForeignKey(x => x.ReviewerUserId).OnDelete(DeleteBehavior.NoAction);
         b.HasIndex(x => x.DriverUserId);
         b.HasIndex(x => new { x.ReporterUserId, x.CreatedAt });
+        b.HasIndex(x => x.Status);
     }
 }

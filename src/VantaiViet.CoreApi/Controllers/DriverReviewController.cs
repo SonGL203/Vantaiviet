@@ -43,6 +43,22 @@ public sealed class DriverReviewController(IDriverReviewService driverReviewServ
         return Ok(ApiResponse<VehicleResponse>.Ok(vehicle, HttpContext.TraceIdentifier));
     }
 
+    /// <summary>"Báo cáo tài xế" queue. Optional filter: status=Open|Reviewed|Dismissed.</summary>
+    [HttpGet("driver-reports")]
+    public async Task<ActionResult<ApiResponse<IReadOnlyList<DriverReportListItem>>>> ListDriverReportsAsync(
+        CancellationToken cancellationToken, string? status = null)
+    {
+        var reports = await driverReviewService.ListDriverReportsAsync(status, cancellationToken);
+        return Ok(ApiResponse<IReadOnlyList<DriverReportListItem>>.Ok(reports, HttpContext.TraceIdentifier));
+    }
+
+    [HttpPut("driver-reports/{reportId:guid}/review")]
+    public async Task<ActionResult<ApiResponse<DriverReportListItem>>> ReviewDriverReportAsync(Guid reportId, DriverReportReviewRequest request, CancellationToken cancellationToken)
+    {
+        var report = await driverReviewService.ReviewDriverReportAsync(reportId, GetActorId(), request, cancellationToken);
+        return Ok(ApiResponse<DriverReportListItem>.Ok(report, HttpContext.TraceIdentifier));
+    }
+
     private Guid GetActorId()
     {
         return Guid.Parse(User.FindFirst(JwtRegisteredClaimNames.Sub)?.Value

@@ -87,6 +87,9 @@ public sealed class VehicleAvailabilityService(CoreDbContext db, ICurrentActor a
             return ShipmentResult<VehicleAvailabilityResponse>.Fail("driver_not_eligible");
         }
 
+        var vehicle = await db.Vehicles.AsNoTracking().Where(x => x.Id == request.VehicleId)
+            .Select(x => new { x.VehicleType, x.MaxPayloadKg, x.BodyType }).SingleAsync(cancellationToken);
+
         var availability = new VehicleAvailability
         {
             Id = Guid.NewGuid(),
@@ -111,11 +114,42 @@ public sealed class VehicleAvailabilityService(CoreDbContext db, ICurrentActor a
             await NotificationEvents.RaiseAsync(db, clock, NotificationTypes.SavedDriverAvailable, brokerUserId, null, actor.UserId, cancellationToken, subjectOverride: route);
         }
 
+        await NotifyMatchingShipmentOwnersAsync(availability, vehicle.VehicleType, cancellationToken);
+
         await db.SaveChangesAsync(cancellationToken);
 
-        var vehicle = await db.Vehicles.AsNoTracking().Where(x => x.Id == request.VehicleId).Select(x => new { x.VehicleType, x.MaxPayloadKg, x.BodyType }).SingleAsync(cancellationToken);
         var driverName = await db.Users.AsNoTracking().Where(x => x.Id == actor.UserId).Select(x => x.DisplayName).SingleAsync(cancellationToken);
         return new(Map(availability, driverName, vehicle.VehicleType, vehicle.MaxPayloadKg, vehicle.BodyType));
+    }
+
+    /// <summary>"Có xe phù hợp": every broker with a Published shipment whose pickup/delivery address matches this
+    /// truck's route (either address containing the other, since both sides write free-text addresses of different
+    /// granularity) and whose required vehicle type is "Any" or the same as this truck's hears about it, not only
+    /// brokers who happen to have this specific driver saved. Unbatched, in memory, same tradeoff as
+    /// <c>ShipmentService.NotifyMatchingRouteInterestsAsync</c> — the set of currently-Published shipments is small.</summary>
+    private async Task NotifyMatchingShipmentOwnersAsync(VehicleAvailability availability, string vehicleType, CancellationToken cancellationToken)
+    {
+        var published = await db.Shipments.AsNoTracking().Where(x => x.Status == ShipmentStatuses.Published)
+            .Select(x => new { x.Id, x.OwnerUserId, x.PickupAddress, x.DeliveryAddress, x.VehicleType }).ToListAsync(cancellationToken);
+        var matches = published.Where(x =>
+            (x.PickupAddress.Contains(availability.FromAddress, StringComparison.OrdinalIgnoreCase) || availability.FromAddress.Contains(x.PickupAddress, StringComparison.OrdinalIgnoreCase))
+            && (x.DeliveryAddress.Contains(availability.ToAddress, StringComparison.OrdinalIgnoreCase) || availability.ToAddress.Contains(x.DeliveryAddress, StringComparison.OrdinalIgnoreCase))
+            && (x.VehicleType == RequiredVehicleTypes.Any || x.VehicleType == vehicleType)).ToList();
+        if (matches.Count == 0)
+        {
+            return;
+        }
+
+        var ownerIds = matches.Select(x => x.OwnerUserId).Distinct().ToList();
+        var brokerOwnerIds = await (from u in db.Users join ur in db.UserRoles on u.Id equals ur.UserId join r in db.Roles on ur.RoleId equals r.Id
+            where ownerIds.Contains(u.Id) && r.NormalizedName == "BROKER" select u.Id).ToListAsync(cancellationToken);
+        foreach (var match in matches)
+        {
+            if (brokerOwnerIds.Contains(match.OwnerUserId))
+            {
+                await NotificationEvents.RaiseAsync(db, clock, NotificationTypes.MatchingVehicleAvailable, match.OwnerUserId, match.Id, actor.UserId, cancellationToken);
+            }
+        }
     }
 
     public async Task<ShipmentResult<IReadOnlyList<VehicleAvailabilityResponse>>> MineAsync(CancellationToken cancellationToken)

@@ -219,7 +219,7 @@ public sealed class DriverNetworkService(CoreDbContext db, ICurrentActor actor, 
         db.AuditEvents.Add(new AuditEvent { ActorUserId = actor.UserId, Action = "driver_report.created", TargetType = "DriverReport", TargetId = report.Id, Outcome = "Succeeded", OccurredAt = report.CreatedAt });
         await db.SaveChangesAsync(cancellationToken);
         var name = await db.Users.AsNoTracking().Where(x => x.Id == driverUserId).Select(x => x.DisplayName).SingleAsync(cancellationToken);
-        return new(new DriverReportResponse(report.Id, driverUserId, name, report.Category, report.Description, report.CreatedAt));
+        return new(new DriverReportResponse(report.Id, driverUserId, name, report.Category, report.Description, report.Status, report.CreatedAt));
     }
 
     public async Task<ShipmentResult<IReadOnlyList<DriverReportResponse>>> MyReportsAsync(CancellationToken cancellationToken)
@@ -230,6 +230,6 @@ public sealed class DriverNetworkService(CoreDbContext db, ICurrentActor actor, 
 
         var ids = rows.Select(x => x.DriverUserId).Distinct().ToList();
         var names = await db.Users.AsNoTracking().Where(x => ids.Contains(x.Id)).ToDictionaryAsync(x => x.Id, x => x.DisplayName, cancellationToken);
-        return new(rows.Select(x => new DriverReportResponse(x.Id, x.DriverUserId, names.GetValueOrDefault(x.DriverUserId, string.Empty), x.Category, x.Description, x.CreatedAt)).ToList());
+        return new(rows.Select(x => new DriverReportResponse(x.Id, x.DriverUserId, names.GetValueOrDefault(x.DriverUserId, string.Empty), x.Category, x.Description, x.Status, x.CreatedAt)).ToList());
     }
 }

@@ -121,7 +121,16 @@ public sealed class TripService(CoreDbContext db, ICurrentActor actor, TimeProvi
             ActionKind.Cancel => NotificationTypes.TripCancelled,
             _ => NotificationTypes.TripIncident
         };
-        await NotificationEvents.RaiseAsync(db,clock,type,actor.UserId == booking.OwnerUserId ? t.DriverUserId : booking.OwnerUserId,booking.ShipmentId,actor.UserId,ct);
+        var counterpart = actor.UserId == booking.OwnerUserId ? t.DriverUserId : booking.OwnerUserId;
+        await NotificationEvents.RaiseAsync(db,clock,type,counterpart,booking.ShipmentId,actor.UserId,ct);
+        // "Chuyến thay đổi" also reaches a broker dispatching someone else's shipment, not only the owner and the driver.
+        var dispatchingBroker = await db.Set<ShipmentBroker>().AsNoTracking().Where(x => x.ShipmentId == booking.ShipmentId && x.Status == "Accepted")
+            .Select(x => (Guid?)x.BrokerUserId).SingleOrDefaultAsync(ct);
+        if (dispatchingBroker is { } brokerId && brokerId != actor.UserId && brokerId != counterpart)
+        {
+            await NotificationEvents.RaiseAsync(db,clock,type,brokerId,booking.ShipmentId,actor.UserId,ct);
+        }
+
         db.TripEvents.Add(new TripEvent {Id=Guid.NewGuid(),TripId=id,ActorUserId=actor.UserId,Action=action.ToString(),Note=note?.Trim(),ProofId=proofId,OccurredAt=now});
         db.AuditEvents.Add(new AuditEvent {ActorUserId=actor.UserId,TargetType="Trip",TargetId=id,Action="trip."+action.ToString().ToLowerInvariant(),Outcome="Succeeded",OccurredAt=now});
         try { await db.SaveChangesAsync(ct); }
